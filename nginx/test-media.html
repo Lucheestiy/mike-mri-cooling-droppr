@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Test - Droppr</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 2rem; 
+            background: #1a1a1a; 
+            color: white; 
+        }
+        .media-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 2rem; 
+            margin: 2rem 0; 
+        }
+        .media-item { 
+            background: #333; 
+            padding: 1rem; 
+            border-radius: 8px; 
+        }
+        video, img { 
+            max-width: 100%; 
+            border-radius: 4px; 
+        }
+        .title { 
+            color: #4CAF50; 
+            margin-bottom: 1rem; 
+        }
+    </style>
+</head>
+<body>
+    <h1>📹 Media Test Page</h1>
+    <p>Testing direct media file access</p>
+    
+    <div class="media-container">
+        <div class="media-item">
+            <h3 class="title">Test Image 1</h3>
+            <img src="/srv/2/IMG_4481.jpeg" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <div style="display:none; color: red;">❌ Image failed to load</div>
+        </div>
+        
+        <div class="media-item">
+            <h3 class="title">Test Video 1</h3>
+            <video controls preload="metadata">
+                <source src="/srv/2/IMG_4482.mov" type="video/quicktime">
+                <source src="/srv/2/IMG_4482.mov" type="video/mp4">
+                ❌ Video not supported
+            </video>
+        </div>
+        
+        <div class="media-item">
+            <h3 class="title">Test Image 2</h3>
+            <img src="/srv/2/IMG_4491.jpeg" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <div style="display:none; color: red;">❌ Image failed to load</div>
+        </div>
+    </div>
+    
+    <h2>🔗 Test with API Paths</h2>
+    <div class="media-container">
+        <div class="media-item">
+            <h3 class="title">Via API - Image</h3>
+            <img src="/api/preview/2/IMG_4481.jpeg" alt="Test via API" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <div style="display:none; color: red;">❌ API image failed</div>
+        </div>
+        
+        <div class="media-item">
+            <h3 class="title">Via API - Video</h3>
+            <video controls preload="metadata">
+                <source src="/api/preview/2/IMG_4482.mov" type="video/quicktime">
+                ❌ API video failed
+            </video>
+        </div>
+    </div>
+</body>
+</html>

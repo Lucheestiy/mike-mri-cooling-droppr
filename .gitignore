@@ -1,0 +1,6 @@
+.env
+config/*
+database/*
+!config/.keep
+!database/.keep
+

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Media Gallery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 3rem 2rem 2rem;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .gallery-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .media-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .media-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        
+        .media-preview {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .media-preview:hover {
+            transform: scale(1.05);
+        }
+        
+        .media-info {
+            padding: 1.5rem;
+        }
+        
+        .media-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+        
+        .media-type {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 95%;
+            max-height: 95%;
+        }
+        
+        .modal img, .modal video {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        
+        .close {
+            position: absolute;
+            top: 30px;
+            right: 50px;
+            color: #fff;
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .close:hover {
+            color: #667eea;
+            transform: scale(1.1);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 4rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .loading h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            border-top: 4px solid #667eea;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 2rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            text-align: center;
+            padding: 4rem;
+            color: #ff6b6b;
+        }
+        
+        .error h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .file-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .file-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📸 Shared Media Gallery</h1>
+        <p>View photos and videos shared with you</p>
+    </div>
+    
+    <div class="gallery-container">
+        <div id="loading" class="loading">
+            <h2>Loading your media...</h2>
+            <div class="loader"></div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;">
+            <h2>❌ Oops! Something went wrong</h2>
+            <p>We couldn't load your shared media files.</p>
+        </div>
+        
+        <div id="media-container" class="media-grid" style="display: none;">
+            <!-- Media files will be populated here -->
+        </div>
+    </div>
+    
+    <!-- Modal for full-size viewing -->
+    <div id="modal" class="modal">
+        <span class="close">&times;</span>
+        <div class="modal-content" id="modal-content">
+            <!-- Media will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // Get share hash from URL parameters or path
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareHash = urlParams.get('share') || window.location.pathname.split('/').pop();
+        
+        // Modal elements
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        const closeBtn = document.querySelector('.close');
+        
+        // Common media file extensions
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'ogg', 'm4v'];
+        
+        // Extract files from ZIP blob (basic implementation)
+        async function extractFilesFromZip(zipBlob) {
+            // For now, we'll use known file names since ZIP parsing is complex
+            // In production, you'd want to use a proper ZIP library
+            const knownFiles = [
+                'IMG_4481.jpeg',
+                'IMG_4482.mov', 
+                'IMG_4491.jpeg'
+            ];
+            
+            return knownFiles.map(filename => {
+                const extension = filename.split('.').pop().toLowerCase();
+                const isImage = imageExtensions.includes(extension);
+                const isVideo = videoExtensions.includes(extension);
+                
+                return {
+                    name: filename,
+                    type: isImage ? 'image' : isVideo ? 'video' : 'unknown',
+                    extension: extension
+                };
+            });
+        }
+        
+        // Load media files using the new media server
+        async function loadMediaFiles() {
+            try {
+                const response = await fetch(`/api/share/${shareHash}/files`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const files = await response.json();
+                
+                if (files.length === 0) {
+                    throw new Error('No media files found in share');
+                }
+                
+                displayMediaFiles(files);
+                
+            } catch (error) {
+                console.error('Error loading media files:', error);
+                showError();
+            }
+        }
+        
+        function displayMediaFiles(files) {
+            const container = document.getElementById('media-container');
+            const loading = document.getElementById('loading');
+            
+            loading.style.display = 'none';
+            container.style.display = 'grid';
+            
+            files.forEach(file => {
+                const card = createMediaCard(file);
+                container.appendChild(card);
+            });
+        }
+        
+        function createMediaCard(file) {
+            const card = document.createElement('div');
+            card.className = 'media-card';
+            
+            const isVideo = file.type === 'video';
+            const isImage = file.type === 'image';
+            
+            // Use the new media server URLs
+            const fileUrl = `/api/share/${shareHash}/file/${encodeURIComponent(file.name)}`;
+            const downloadUrl = fileUrl; // Same URL, browser will handle appropriately
+            
+            // Format file size
+            const formatSize = (bytes) => {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            };
+            
+            let mediaHTML;
+            
+            if (isVideo) {
+                mediaHTML = `
+                    <div class="media-preview" onclick="openModal('${file.name}', 'video')">
+                        <div class="file-placeholder">
+                            <div class="file-icon">🎬</div>
+                            <div>${file.name}</div>
+                        </div>
+                    </div>
+                `;
+            } else if (isImage) {
+                mediaHTML = `
+                    <img class="media-preview" 
+                         src="${fileUrl}" 
+                         alt="${file.name}" 
+                         onclick="openModal('${file.name}', 'image')"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="file-placeholder" style="display:none;">
+                        <div class="file-icon">🖼️</div>
+                        <div>${file.name}</div>
+                    </div>
+                `;
+            } else {
+                mediaHTML = `
+                    <div class="file-placeholder">
+                        <div class="file-icon">📁</div>
+                        <div>${file.name}</div>
+                    </div>
+                `;
+            }
+            
+            card.innerHTML = `
+                ${mediaHTML}
+                <div class="media-info">
+                    <div class="media-title">${file.name}</div>
+                    <div class="media-type">${file.type.toUpperCase()} • ${file.extension.toUpperCase()} • ${formatSize(file.size)}</div>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="openModal('${file.name}', '${file.type}')">
+                            ${isVideo ? '▶️ Play' : '👁️ View'}
+                        </button>
+                        <a href="${downloadUrl}" 
+                           class="btn btn-secondary" download="${file.name}">
+                            💾 Download
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function openModal(filename, type) {
+            const isVideo = type === 'video';
+            const fileUrl = `/api/share/${shareHash}/file/${encodeURIComponent(filename)}`;
+            
+            if (isVideo) {
+                modalContent.innerHTML = `
+                    <video controls autoplay style="max-width: 100%; max-height: 100%; border-radius: 15px;">
+                        <source src="${fileUrl}" type="video/mp4">
+                        <source src="${fileUrl}" type="video/quicktime">
+                        Your browser doesn't support video playback.
+                    </video>
+                `;
+            } else {
+                modalContent.innerHTML = `
+                    <img src="${fileUrl}" alt="${filename}" 
+                         style="max-width: 100%; max-height: 100%; border-radius: 15px;">
+                `;
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function showError() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+        
+        // Modal event handlers
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                modal.style.display = 'none';
+            }
+        });
+        
+        // Initialize
+        if (shareHash && shareHash !== 'gallery') {
+            loadMediaFiles();
+        } else {
+            showError();
+        }
+    </script>
+</body>
+</html>

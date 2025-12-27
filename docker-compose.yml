@@ -1,0 +1,60 @@
+services:
+  app:
+    image: filebrowser/filebrowser:latest
+    container_name: droppr-app
+    restart: unless-stopped
+    volumes:
+      - ./data:/srv
+      - ./database:/database
+      - ./config:/config
+    networks:
+      - default
+
+  droppr:
+    image: nginx:1.25-alpine
+    container_name: droppr
+    restart: unless-stopped
+    ports:
+      - "${DROPPR_HOST_PORT:-8098}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
+      - ./nginx/media-viewer.html:/usr/share/nginx/html/media-viewer.html:ro
+      - ./nginx/test-media.html:/usr/share/nginx/html/test-media.html:ro
+    environment:
+      - VIRTUAL_HOST=droppr.coolmri.com
+      - VIRTUAL_PORT=80
+    depends_on:
+      - app
+    networks:
+      - default
+      - mri-cooling_default
+
+  faststart:
+    build:
+      context: ./faststart
+    container_name: droppr-faststart
+    restart: unless-stopped
+    user: "1000:1000"
+    volumes:
+      - ./data:/srv
+    environment:
+      - WATCH_DIR=/srv
+    depends_on:
+      - app
+
+  media-server:
+    build:
+      context: ./media-server
+    container_name: droppr-media-server
+    restart: unless-stopped
+    depends_on:
+      - app
+    networks:
+      - default
+
+networks:
+  default:
+    name: mri-cooling-droppr_default
+  mri-cooling_default:
+    external: true
