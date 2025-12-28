@@ -11,6 +11,7 @@ import mimetypes
 import time
 import shutil
 import fcntl
+import json
 from flask import Flask, send_file, jsonify, request, Response, stream_with_context, send_from_directory
 import requests
 
@@ -38,6 +39,55 @@ def release_lock(lock_file):
     if lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_UN)
         lock_file.close()
+
+def find_file_in_dir(root_dir, target_filename):
+    """Recursively find a file in the directory structure"""
+    for root, dirs, files in os.walk(root_dir):
+        if target_filename in files:
+            return os.path.join(root, target_filename)
+    return None
+
+def generate_metadata(share_dir):
+    """Generate metadata.json for the share to avoid re-scanning"""
+    file_list = []
+    
+    for root, dirs, files in os.walk(share_dir):
+        for filename in files:
+            if filename.startswith('.') or filename == 'metadata.json' or '__MACOSX' in root:
+                continue
+                
+            full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, share_dir)
+            
+            extension = filename.split('.')[-1].lower() if '.' in filename else ''
+            
+            # Determine file type
+            image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
+            video_exts = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v']
+            
+            if extension in image_exts:
+                file_type = 'image'
+            elif extension in video_exts:
+                file_type = 'video'
+            else:
+                file_type = 'file'
+            
+            file_list.append({
+                'name': filename,
+                'path': rel_path,
+                'type': file_type,
+                'extension': extension,
+                'size': os.path.getsize(full_path)
+            })
+            
+    # Save to disk
+    try:
+        with open(os.path.join(share_dir, 'metadata.json'), 'w') as f:
+            json.dump(file_list, f)
+    except Exception as e:
+        app.logger.error(f"Failed to save metadata: {e}")
+        
+    return file_list
 
 def ensure_share_extracted(share_hash):
     """
@@ -76,10 +126,11 @@ def ensure_share_extracted(share_hash):
             # Extract
             os.makedirs(share_dir, exist_ok=True)
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # We need to handle nested folders or flatten them, or just extract as is
-                # For now, extract as is.
                 zip_ref.extractall(share_dir)
             
+            # Generate Metadata Cache
+            generate_metadata(share_dir)
+
             # Cleanup ZIP
             os.remove(zip_path)
             
@@ -95,13 +146,6 @@ def ensure_share_extracted(share_hash):
     finally:
         release_lock(lock)
 
-def find_file_in_dir(root_dir, target_filename):
-    """Recursively find a file in the directory structure"""
-    for root, dirs, files in os.walk(root_dir):
-        if target_filename in files:
-            return os.path.join(root, target_filename)
-    return None
-
 @app.route('/api/share/<share_hash>/files')
 def list_share_files(share_hash):
     """API endpoint to list files in a share"""
@@ -109,45 +153,21 @@ def list_share_files(share_hash):
     if not share_dir:
         return jsonify({"error": "Failed to load share"}), 500
 
-    file_list = []
-    
-    for root, dirs, files in os.walk(share_dir):
-        for filename in files:
-            if filename.startswith('.') or '__MACOSX' in root:
-                continue
-                
-            full_path = os.path.join(root, filename)
-            rel_path = os.path.relpath(full_path, share_dir)
+    # Try to read cached metadata
+    metadata_path = os.path.join(share_dir, 'metadata.json')
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, 'r') as f:
+                return jsonify(json.load(f))
+        except Exception:
+            pass # Fallback to manual scan if cache corrupt
             
-            extension = filename.split('.')[-1].lower() if '.' in filename else ''
-            
-            # Determine file type
-            image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
-            video_exts = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v']
-            
-            if extension in image_exts:
-                file_type = 'image'
-            elif extension in video_exts:
-                file_type = 'video'
-            else:
-                file_type = 'file'
-            
-            file_list.append({
-                'name': filename, # Keeping simple filename for now as per frontend
-                'path': rel_path,
-                'type': file_type,
-                'extension': extension,
-                'size': os.path.getsize(full_path)
-            })
-            
-    return jsonify(file_list)
+    # Fallback (or first time if generation failed)
+    return jsonify(generate_metadata(share_dir))
 
 @app.route('/api/share/<share_hash>/file/<path:filename>')
 def serve_file(share_hash, filename):
     """Serve individual file from extracted directory"""
-    # Note: filename here might be just the name or a path, depending on how frontend requests it.
-    # The frontend uses encodeURIComponent(file.name).
-    
     share_dir = os.path.join(EXTRACT_ROOT, share_hash)
     if not os.path.exists(share_dir):
         # Try to restore if missing (e.g. restart)
@@ -155,9 +175,6 @@ def serve_file(share_hash, filename):
         if not share_dir:
             return "Share not found", 404
 
-    # If the frontend requests just "IMG_123.jpg" but it's in "SubFolder/IMG_123.jpg", we need to find it.
-    # Current frontend logic sends just the name.
-    
     # Security: Ensure we don't traverse up
     if '..' in filename:
          return "Invalid filename", 400
@@ -167,7 +184,7 @@ def serve_file(share_hash, filename):
     if os.path.isfile(full_path):
          return send_from_directory(share_dir, filename)
          
-    # Fallback: Search for the file (expensive but necessary if frontend only knows basenames)
+    # Fallback: Search for the file
     found_path = find_file_in_dir(share_dir, filename)
     if found_path:
         # Serve relative to share_dir
@@ -179,7 +196,6 @@ def serve_file(share_hash, filename):
 @app.route('/api/share/<share_hash>/download')
 def download_all(share_hash):
     """Proxy the full ZIP download from FileBrowser"""
-    # For download all, we can stream from upstream to keep it simple and fresh
     try:
         req_url = f"{FILEBROWSER_API}/{share_hash}?download=1"
         req = requests.get(req_url, stream=True, timeout=120)
