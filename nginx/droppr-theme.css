@@ -1,0 +1,104 @@
+/* Droppr Dark Theme (Matches Gallery) */
+:root {
+    --bg-color: #0f172a !important;
+    --card-bg: #1e293b !important;
+    --text-primary: #f1f5f9 !important;
+    --text-secondary: #94a3b8 !important;
+    --accent-color: #6366f1 !important;
+    --border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body, #app, .v-application {
+    background-color: var(--bg-color) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Header */
+.v-app-bar, header {
+    background-color: var(--bg-color) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    box-shadow: none !important;
+}
+
+/* Sidebar */
+.v-navigation-drawer, nav {
+    background-color: var(--bg-color) !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+/* Cards/Lists */
+.v-card, .v-sheet {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Text Colors */
+.v-list-item__title, h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary) !important;
+}
+
+.v-list-item__subtitle, p, span, div {
+    color: var(--text-secondary);
+}
+
+/* Icons */
+.v-icon {
+    color: var(--text-secondary) !important;
+}
+
+.v-icon.primary--text {
+    color: var(--accent-color) !important;
+}
+
+/* Buttons */
+.v-btn {
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}
+
+.v-btn--contained {
+    background-color: var(--accent-color) !important;
+    color: white !important;
+}
+
+/* Inputs */
+input, textarea, select {
+    color: var(--text-primary) !important;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-color); 
+}
+::-webkit-scrollbar-thumb {
+    background: #334155; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569; 
+}
+
+/* File Browser Specifics */
+/* Hide the default logo if possible or recolor */
+.v-toolbar__title {
+    color: var(--text-primary) !important;
+}
+
+/* Selection */
+.row.list-item.active, .v-list-item--active {
+    background-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Loading screen */
+#loading {
+    background-color: var(--bg-color) !important;
+}
+#loading .spinner > div {
+    background-color: var(--accent-color) !important;
+}
