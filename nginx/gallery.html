@@ -511,6 +511,70 @@
             padding: 4rem 1rem;
             color: var(--text-secondary);
         }
+
+        /* Back to Top Button */
+        .back-to-top {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            background: var(--accent-color);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 1.5rem;
+        }
+
+        .back-to-top.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            background: var(--accent-hover);
+            transform: translateY(-5px);
+        }
+
+        /* Media Card Improvements */
+        .media-tag {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: white;
+            z-index: 2;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .media-preview-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.4));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .media-card:hover .media-preview-container::after {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -570,6 +634,7 @@
                 <button class="icon-btn" id="zoomBtn" title="Zoom">🔍</button>
                 <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
                 <button class="icon-btn" id="slideshowBtn" title="Slideshow">▶</button>
+                <a href="#" class="icon-btn" id="viewOriginalBtn" target="_blank" title="View Original">↗</a>
             </div>
             <button class="icon-btn" id="closeBtn" title="Close">×</button>
         </div>
@@ -593,6 +658,8 @@
         <span id="toastMessage">Action successful</span>
     </div>
 
+    <button id="backToTop" class="back-to-top" title="Back to Top">↑</button>
+
     <script>
         // State
         const state = {
@@ -606,7 +673,9 @@
             isSlideshow: false,
             slideshowInterval: null,
             isZoomed: false,
-            immersiveTimer: null
+            immersiveTimer: null,
+            touchStartX: 0,
+            touchEndX: 0
         };
 
         // DOM Elements
@@ -622,7 +691,9 @@
             modalTitle: document.getElementById('modalTitle'),
             modalMeta: document.getElementById('modalMeta'),
             downloadAll: document.getElementById('downloadAllBtn'),
-            copyLink: document.getElementById('copyLinkBtn')
+            copyLink: document.getElementById('copyLinkBtn'),
+            backToTop: document.getElementById('backToTop'),
+            viewOriginal: document.getElementById('viewOriginalBtn')
         };
 
         // Initialize
@@ -631,6 +702,19 @@
                 showToast('Invalid share link', 'error');
                 return;
             }
+
+            // Scroll listener for Back to Top
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 500) {
+                    els.backToTop.classList.add('show');
+                } else {
+                    els.backToTop.classList.remove('show');
+                }
+            });
+
+            els.backToTop.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
 
             // Setup download link
             els.downloadAll.href = `/api/share/${state.shareHash}/download`;
@@ -726,8 +810,11 @@
                 `;
             }
 
+            const tag = isVideo ? '<div class="media-tag">Video</div>' : (isImage ? '<div class="media-tag">Image</div>' : '');
+
             return `
                 <div class="media-preview-container" onclick="openModal(${index})">
+                    ${tag}
                     ${preview}
                 </div>
                 <div class="media-info">
@@ -757,6 +844,10 @@
             els.modal.classList.add('show');
             updateModalContent();
             resetImmersiveTimer();
+            
+            // Add swipe listeners when modal opens
+            els.modal.addEventListener('touchstart', handleTouchStart, {passive: true});
+            els.modal.addEventListener('touchend', handleTouchEnd, {passive: true});
         };
 
         function updateModalContent() {
@@ -766,6 +857,9 @@
             els.modalTitle.textContent = file.name;
             els.modalMeta.textContent = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file.size)}`;
             
+            // Update View Original Link
+            els.viewOriginal.href = fileUrl;
+
             els.modalContent.innerHTML = '';
             
             if (file.type === 'video') {
@@ -797,6 +891,11 @@
         function closeModal() {
             els.modal.classList.remove('show');
             exitFullscreen(); // Ensure we exit browser fullscreen too
+            
+            // Remove swipe listeners
+            els.modal.removeEventListener('touchstart', handleTouchStart);
+            els.modal.removeEventListener('touchend', handleTouchEnd);
+
             setTimeout(() => {
                 els.modal.style.display = 'none';
                 els.modalContent.innerHTML = ''; // Stop video playback
@@ -804,6 +903,25 @@
                 state.isZoomed = false;
                 els.modal.classList.remove('immersive'); // Reset immersive state
             }, 300);
+        }
+
+        function handleTouchStart(e) {
+            state.touchStartX = e.changedTouches[0].screenX;
+        }
+
+        function handleTouchEnd(e) {
+            state.touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }
+
+        function handleSwipe() {
+            const threshold = 50;
+            if (state.touchEndX < state.touchStartX - threshold) {
+                navigate(1); // Swipe left, go next
+            }
+            if (state.touchEndX > state.touchStartX + threshold) {
+                navigate(-1); // Swipe right, go prev
+            }
         }
 
         function navigate(dir) {
