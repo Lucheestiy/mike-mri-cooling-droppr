@@ -666,7 +666,9 @@
             files: [],
             filteredFiles: [],
             currentIndex: 0,
-            shareHash: new URLSearchParams(window.location.search).get('share') || window.location.pathname.split('/').pop(),
+            // Robust extraction: remove empty segments and 'gallery', take the last one
+            shareHash: new URLSearchParams(window.location.search).get('share') || 
+                       window.location.pathname.split('/').filter(p => p && p !== 'gallery').pop(),
             filter: 'all',
             sort: 'type_asc', // Default sort by type
             search: '',
