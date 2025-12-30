@@ -24,7 +24,7 @@ services:
       - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
       - ./nginx/analytics.html:/usr/share/nginx/html/analytics.html:ro
       - ./nginx/media-viewer.html:/usr/share/nginx/html/media-viewer.html:ro
-      - ./nginx/video-player.html:/usr/share/nginx/html/video-player.html:ro
+      - ./nginx-fixed/video-player.html:/usr/share/nginx/html/video-player.html:ro
       - ./nginx/test-media.html:/usr/share/nginx/html/test-media.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
       - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
