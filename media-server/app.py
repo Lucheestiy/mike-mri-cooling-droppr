@@ -333,6 +333,7 @@ def _get_auth_token() -> str | None:
 def _fetch_filebrowser_shares(token: str) -> list[dict]:
     # TEMPORARY FIX: Disable fetching shares to prevent FileBrowser panic (slice bounds out of range)
     # The endpoint GET /api/shares seems to crash the current FileBrowser instance.
+    # TODO: Re-enable once FileBrowser is updated or the root cause is fixed.
     app.logger.warning("Skipping _fetch_filebrowser_shares to prevent crash")
     return []
 

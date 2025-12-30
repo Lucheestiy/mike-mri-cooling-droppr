@@ -1152,6 +1152,50 @@
             setTimeout(() => t.classList.remove('show'), 3000);
         }
 
+        // Robust clipboard copy with iOS Safari fallback
+        async function copyToClipboard(text) {
+            // Try modern Clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (e) {
+                    console.warn('Clipboard API failed, trying fallback:', e);
+                }
+            }
+
+            // Fallback for iOS Safari and older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.cssText = 'position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;outline:none;box-shadow:none;background:transparent;font-size:16px;';
+            document.body.appendChild(textarea);
+
+            // iOS Safari specific handling
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (isIOS) {
+                const range = document.createRange();
+                range.selectNodeContents(textarea);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                textarea.setSelectionRange(0, text.length);
+            } else {
+                textarea.focus();
+                textarea.select();
+            }
+
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (e) {
+                console.warn('execCommand copy failed:', e);
+            }
+
+            document.body.removeChild(textarea);
+            return success;
+        }
+
         // Prevent the underlying page from scrolling while the modal is open.
         // This avoids expensive repaint work (and perceived "freezing") on some devices,
         // especially while a video is playing.
@@ -1747,9 +1791,9 @@
             });
 
             // Copy link
-            els.copyLink.onclick = () => {
-                navigator.clipboard.writeText(window.location.href);
-                showToast('Link copied');
+            els.copyLink.onclick = async () => {
+                const success = await copyToClipboard(window.location.href);
+                showToast(success ? 'Link copied' : 'Copy failed - select and copy manually');
             };
 
             // Refresh

@@ -5,6 +5,7 @@ services:
     image: mri-cooling-droppr-app:custom
     container_name: droppr-app
     restart: unless-stopped
+    user: "1000:1000"
     volumes:
       - ./data:/srv
       - ./database:/database

@@ -223,22 +223,42 @@
     if (el && el.parentNode) el.parentNode.removeChild(el);
   }
 
+  // Robust clipboard copy with iOS Safari fallback
   function copyText(text) {
+    // Try modern Clipboard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text);
+      return navigator.clipboard.writeText(text).catch(function () {
+        // If Clipboard API fails, try fallback
+        return copyTextFallback(text);
+      });
     }
+    return copyTextFallback(text);
+  }
 
+  function copyTextFallback(text) {
     return new Promise(function (resolve, reject) {
       try {
         var textarea = document.createElement("textarea");
         textarea.value = text;
-        textarea.setAttribute("readonly", "readonly");
-        textarea.style.position = "fixed";
-        textarea.style.top = "-9999px";
-        textarea.style.left = "-9999px";
+        textarea.setAttribute("readonly", "");
+        // Position on-screen but visually hidden (iOS Safari needs this)
+        textarea.style.cssText = "position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;outline:none;box-shadow:none;background:transparent;font-size:16px;";
         document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
+
+        // iOS Safari specific handling
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          var range = document.createRange();
+          range.selectNodeContents(textarea);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          textarea.setSelectionRange(0, text.length);
+        } else {
+          textarea.focus();
+          textarea.select();
+        }
+
         var ok = document.execCommand("copy");
         document.body.removeChild(textarea);
         if (!ok) return reject(new Error("Copy failed"));
@@ -911,8 +931,106 @@
     }
   }
 
+  // Validate that file is fully available (handles iCloud files still downloading)
+  function validateFileReadable(file) {
+    return new Promise(function (resolve) {
+      // Skip validation for small files (under 1MB)
+      if (file.size < 1024 * 1024) {
+        resolve(true);
+        return;
+      }
+
+      // Try to read first 64KB of the file to verify it's accessible
+      var slice = file.slice(0, 65536);
+      var reader = new FileReader();
+      var timeout = null;
+
+      function cleanup() {
+        if (timeout) clearTimeout(timeout);
+        reader.onload = null;
+        reader.onerror = null;
+      }
+
+      reader.onload = function () {
+        cleanup();
+        resolve(true);
+      };
+
+      reader.onerror = function () {
+        cleanup();
+        resolve(false);
+      };
+
+      // Set timeout for slow iCloud downloads
+      timeout = setTimeout(function () {
+        cleanup();
+        try { reader.abort(); } catch (e) {}
+        resolve(false);
+      }, 5000);
+
+      try {
+        reader.readAsArrayBuffer(slice);
+      } catch (e) {
+        cleanup();
+        resolve(false);
+      }
+    });
+  }
+
+  function showFileNotReadyWarning(fileName) {
+    var WARNING_ID = "droppr-icloud-warning";
+    var existing = document.getElementById(WARNING_ID);
+    if (existing) existing.parentNode.removeChild(existing);
+
+    var warning = document.createElement("div");
+    warning.id = WARNING_ID;
+    warning.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2147483002;padding:16px 24px;border-radius:12px;background:rgba(220,38,38,0.95);color:#fff;font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;box-shadow:0 10px 40px rgba(0,0,0,0.4);max-width:90vw;text-align:center;";
+    warning.innerHTML = '<div style="margin-bottom:8px;">File not ready: ' + (fileName || 'Unknown') + '</div>' +
+      '<div style="font-weight:400;font-size:12px;opacity:0.9;">Please wait for the file to download from iCloud before uploading.</div>';
+
+    document.body.appendChild(warning);
+
+    setTimeout(function () {
+      if (warning.parentNode) warning.parentNode.removeChild(warning);
+    }, 6000);
+  }
+
+  function patchFileInputs() {
+    if (window.__dropprFileInputPatched) return;
+    window.__dropprFileInputPatched = true;
+
+    // Intercept file input change events
+    document.addEventListener("change", function (e) {
+      var input = e.target;
+      if (!input || input.type !== "file" || !input.files || input.files.length === 0) return;
+
+      var files = Array.prototype.slice.call(input.files);
+      var largeFiles = files.filter(function (f) { return f.size >= 1024 * 1024; });
+
+      // Skip validation if no large files
+      if (largeFiles.length === 0) return;
+
+      // Check if files are readable (validates iCloud downloads are complete)
+      var validationPromises = largeFiles.map(function (file) {
+        return validateFileReadable(file).then(function (ok) {
+          return { file: file, ok: ok };
+        });
+      });
+
+      Promise.all(validationPromises).then(function (results) {
+        var failed = results.filter(function (r) { return !r.ok; });
+        if (failed.length > 0) {
+          // Show warning for first failed file
+          showFileNotReadyWarning(failed[0].file.name);
+          console.warn("Droppr: File not ready for upload (possibly still downloading from iCloud):", failed[0].file.name);
+        }
+      });
+    }, true);
+  }
+
   function boot() {
     patchUploadDetectors();
+    patchFileInputs();
     ensureAnalyticsButton();
     var observer = new MutationObserver(function () {
       ensureAnalyticsButton();
