@@ -6,7 +6,7 @@
     <title>Media Test - Droppr</title>
     <style>
         body { 
-            font-family: Arial, sans-serif; 
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
             margin: 2rem; 
             background: #1a1a1a; 
             color: white; 
@@ -30,6 +30,33 @@
             color: #4CAF50; 
             margin-bottom: 1rem; 
         }
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .video-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+        .video-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -39,22 +66,28 @@
     <div class="media-container">
         <div class="media-item">
             <h3 class="title">Test Image 1</h3>
-            <img src="/srv/2/IMG_4481.jpeg" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <img src="/api/public/dl/testshare/IMG_4482.mov?inline=true" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
             <div style="display:none; color: red;">❌ Image failed to load</div>
         </div>
         
         <div class="media-item">
             <h3 class="title">Test Video 1</h3>
-            <video controls preload="metadata">
-                <source src="/srv/2/IMG_4482.mov" type="video/quicktime">
-                <source src="/srv/2/IMG_4482.mov" type="video/mp4">
-                ❌ Video not supported
-            </video>
+            <div class="video-container">
+                <video id="video1" controls preload="metadata" playsinline poster="/api/share/testshare/preview/IMG_4482.mov">
+                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/quicktime">
+                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4">
+                    ❌ Video not supported
+                </video>
+                <div class="video-loader">
+                    <div class="spinner"></div>
+                    <div>Loading...</div>
+                </div>
+            </div>
         </div>
         
         <div class="media-item">
-            <h3 class="title">Test Image 2</h3>
-            <img src="/srv/2/IMG_4491.jpeg" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <h3 class="title">Test Image 2 (via Share API)</h3>
+            <img src="/api/share/testshare/file/debug_red_mask.png" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
             <div style="display:none; color: red;">❌ Image failed to load</div>
         </div>
     </div>
@@ -62,18 +95,42 @@
     <h2>🔗 Test with API Paths</h2>
     <div class="media-container">
         <div class="media-item">
-            <h3 class="title">Via API - Image</h3>
-            <img src="/api/preview/2/IMG_4481.jpeg" alt="Test via API" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
+            <h3 class="title">Via Preview API - Image</h3>
+            <img src="/api/share/testshare/preview/debug_red_mask.png" alt="Test via API" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
             <div style="display:none; color: red;">❌ API image failed</div>
         </div>
         
         <div class="media-item">
-            <h3 class="title">Via API - Video</h3>
-            <video controls preload="metadata">
-                <source src="/api/preview/2/IMG_4482.mov" type="video/quicktime">
-                ❌ API video failed
-            </video>
+            <h3 class="title">Via Preview API - Video</h3>
+            <div class="video-container">
+                <video id="video2" controls preload="metadata" playsinline poster="/api/share/testshare/preview/IMG_4482.mov">
+                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/quicktime">
+                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4">
+                    ❌ API video failed
+                </video>
+                <div class="video-loader">
+                    <div class="spinner"></div>
+                    <div>Loading...</div>
+                </div>
+            </div>
         </div>
     </div>
+    
+    <script>
+        // Add video loading behavior
+        document.querySelectorAll('video').forEach(video => {
+            const loader = video.parentElement.querySelector('.video-loader');
+            if (loader) {
+                video.onloadstart = () => loader.style.display = 'block';
+                video.onwaiting = () => loader.style.display = 'block';
+                video.oncanplaythrough = () => loader.style.display = 'none';
+                video.onplaying = () => loader.style.display = 'none';
+                video.onerror = () => {
+                    loader.style.display = 'none';
+                    console.error('Video failed to load:', video.src);
+                };
+            }
+        });
+    </script>
 </body>
 </html>

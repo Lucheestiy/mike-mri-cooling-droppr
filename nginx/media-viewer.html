@@ -12,7 +12,7 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
             background: #1a1a1a;
             color: #fff;
             overflow-x: hidden;
@@ -140,6 +140,31 @@
             color: #888;
         }
         
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .video-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+        
         .error {
             text-align: center;
             padding: 3rem;
@@ -192,6 +217,24 @@
                 // Since we can't easily parse the ZIP, we'll use known files
                 // and test their accessibility
                 
+                // Use dynamic share detection instead of hardcoded files
+                const shareHash = urlParams.get('share') || window.location.pathname.split('/').pop();
+                if (!shareHash) {
+                    throw new Error('No share hash found');
+                }
+                
+                // Try to fetch file list from the share API
+                try {
+                    const response = await fetch(`/api/share/${shareHash}/files`);
+                    if (response.ok) {
+                        const files = await response.json();
+                        displayMediaFiles(files.slice(0, 10)); // Show first 10 files
+                        return;
+                    }
+                } catch (e) {
+                    console.log('Could not fetch file list from API, falling back to known files');
+                }
+                
                 const knownFiles = [
                     { name: 'IMG_4481.jpeg', type: 'image' },
                     { name: 'IMG_4482.mov', type: 'video' },
@@ -203,16 +246,16 @@
                 
                 for (const file of knownFiles) {
                     try {
-                        const fileUrl = `/share/${shareHash}?inline=true&file=${file.name}`;
+                        const fileUrl = `/api/share/${shareHash}/file/${file.name}`;
                         const response = await fetch(fileUrl, { method: 'HEAD' });
                         if (response.ok) {
                             accessibleFiles.push(file);
                         }
                     } catch (e) {
                         console.log(`File ${file.name} not accessible via ${fileUrl}`);
-                        // Try alternative URL format
+                        // Try direct download URL
                         try {
-                            const altUrl = `/api/public/share/${shareHash}/${file.name}`;
+                            const altUrl = `/api/public/dl/${shareHash}/${file.name}`;
                             const response2 = await fetch(altUrl, { method: 'HEAD' });
                             if (response2.ok) {
                                 accessibleFiles.push({...file, altUrl: altUrl});
@@ -232,7 +275,7 @@
                 
             } catch (error) {
                 console.error('Error loading media files:', error);
-                showError();
+                showError(`Failed to load media files: ${error.message}`);
             }
         }
         
@@ -254,20 +297,24 @@
             card.className = 'media-card';
             
             const isVideo = file.type === 'video';
-            // Use the standard FileBrowser public download URLs
-            const fileUrl = file.altUrl || `/api/public/dl/${shareHash}/${file.name}?inline=true`;
-            const downloadUrl = `/api/public/dl/${shareHash}/${file.name}`;
+            const shareHash = new URLSearchParams(window.location.search).get('share') || window.location.pathname.split('/').pop();
+            // Use consistent API URLs
+            const fileUrl = file.inline_url || `/api/public/dl/${shareHash}/${file.name}?inline=true`;
+            const downloadUrl = file.download_url || `/api/share/${shareHash}/file/${file.name}?download=1`;
+            const previewUrl = `/api/share/${shareHash}/preview/${file.name}`;
             
             card.innerHTML = `
                 ${isVideo 
-                    ? `<video class="media-preview" preload="metadata" muted>
-                         <source src="${fileUrl}" type="video/mp4">
-                         <source src="${fileUrl}" type="video/quicktime">
-                         <div style="padding: 20px; text-align: center; color: #888;">
+                    ? `<div style="position: relative;">
+                         <img class="media-preview" src="${previewUrl}" alt="${file.name}" 
+                              style="object-fit: cover; height: 200px; width: 100%;"
+                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                         <div style="display:none; padding: 20px; text-align: center; color: #888; height: 200px; background: #333; align-items: center; justify-content: center; flex-direction: column;">
                             🎬 ${file.name}<br>
-                            <small>Click to attempt playback</small>
+                            <small>Video preview unavailable</small>
                          </div>
-                       </video>`
+                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; pointer-events: none;">▶</div>
+                       </div>`
                     : `<img class="media-preview" src="${fileUrl}" alt="${file.name}" 
                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                        <div style="display:none; padding: 20px; text-align: center; color: #888;">
@@ -279,7 +326,7 @@
                     <div class="media-title">${file.name}</div>
                     <div class="media-size">${file.type}</div>
                     <a href="${downloadUrl}" class="download-btn" download>📥 Download</a>
-                    <a href="/share/${shareHash}" class="download-btn" style="background: #2196F3;">🔗 Browse Files</a>
+                    <a href="/gallery/${shareHash}" class="download-btn" style="background: #2196F3;">🔗 Gallery</a>
                 </div>
             `;
             
@@ -297,19 +344,44 @@
         function openModal(file, url) {
             const isVideo = file.type === 'video';
             
-            modalContent.innerHTML = isVideo 
-                ? `<video controls autoplay style="max-width: 100%; max-height: 100%;">
-                     <source src="${url}" type="video/mp4">
-                     <source src="${url}" type="video/quicktime">
-                   </video>`
-                : `<img src="${url}" alt="${file.name}" style="max-width: 100%; max-height: 100%;">`;
+            if (isVideo) {
+                modalContent.innerHTML = `
+                    <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                        <video controls autoplay playsinline style="max-width: 100%; max-height: 100%;">
+                            <source src="${url}" type="video/mp4">
+                            <source src="${url}" type="video/quicktime">
+                        </video>
+                        <div class="video-loader">
+                            <div class="spinner"></div>
+                            <div>Loading...</div>
+                        </div>
+                    </div>
+                `;
+                const v = modalContent.querySelector('video');
+                const l = modalContent.querySelector('.video-loader');
+                if (v && l) {
+                    v.onloadstart = () => l.style.display = 'block';
+                    v.onwaiting = () => l.style.display = 'block';
+                    v.oncanplaythrough = () => l.style.display = 'none';
+                    v.onplaying = () => l.style.display = 'none';
+                }
+            } else {
+                modalContent.innerHTML = `<img src="${url}" alt="${file.name}" style="max-width: 100%; max-height: 100%;">`;
+            }
             
             modal.style.display = 'block';
         }
         
-        function showError() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
+        function showError(message = 'Please check your share link and try again.') {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const errorText = error.querySelector('p');
+            
+            loading.style.display = 'none';
+            error.style.display = 'block';
+            if (errorText) {
+                errorText.textContent = message;
+            }
         }
         
         // Modal event handlers
@@ -331,10 +403,10 @@
         });
         
         // Initialize
-        if (shareHash) {
+        if (shareHash && shareHash !== 'media-viewer.html') {
             loadMediaFiles();
         } else {
-            showError();
+            showError('No valid share hash found in URL. Please use a proper share link.');
         }
     </script>
 </body>

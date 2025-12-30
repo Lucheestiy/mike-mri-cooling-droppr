@@ -1,0 +1,16 @@
+# Cloudflare Tunnel Configuration - DROPPR ONLY
+#
+# Run ./setup-cloudflare-tunnel.sh to create a dedicated tunnel and write the
+# correct tunnel ID + credentials file.
+
+tunnel: TUNNEL_ID
+credentials-file: /etc/cloudflared/creds/credentials.json
+protocol: http2
+
+ingress:
+  - hostname: droppr.coolmri.com
+    service: http://droppr:80
+    originRequest:
+      noTLSVerify: true
+
+  - service: http_status:404

@@ -6,12 +6,14 @@ WATCH_DIR="${WATCH_DIR:-/srv}"
 echo "droppr-faststart: watching ${WATCH_DIR} for new .mov/.mp4/.m4v uploads"
 
 inotifywait -m -r -e close_write -e moved_to --format '%w%f' "${WATCH_DIR}" | while IFS= read -r path; do
-  case "${path}" in
+  lower="$(printf '%s' "${path}" | tr '[:upper:]' '[:lower:]')"
+
+  case "${lower}" in
     *.mov|*.mp4|*.m4v) ;;
     *) continue ;;
   esac
 
-  case "${path}" in
+  case "${lower}" in
     */.*) continue ;;
     *.original.*) continue ;;
     *.faststart.*) continue ;;
@@ -20,4 +22,3 @@ inotifywait -m -r -e close_write -e moved_to --format '%w%f' "${WATCH_DIR}" | wh
 
   python3 /app/faststart.py "${path}" || true
 done
-

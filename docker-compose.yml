@@ -1,6 +1,8 @@
 services:
   app:
-    image: filebrowser/filebrowser:latest
+    build:
+      context: ./app
+    image: mri-cooling-droppr-app:custom
     container_name: droppr-app
     restart: unless-stopped
     volumes:
@@ -19,17 +21,17 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
+      - ./nginx/analytics.html:/usr/share/nginx/html/analytics.html:ro
       - ./nginx/media-viewer.html:/usr/share/nginx/html/media-viewer.html:ro
+      - ./nginx/video-player.html:/usr/share/nginx/html/video-player.html:ro
       - ./nginx/test-media.html:/usr/share/nginx/html/test-media.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
-    environment:
-      - VIRTUAL_HOST=droppr.coolmri.com
-      - VIRTUAL_PORT=80
+      - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
+      - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
     depends_on:
       - app
     networks:
       - default
-      - mri-cooling_default
 
   faststart:
     build:
@@ -49,13 +51,35 @@ services:
       context: ./media-server
     container_name: droppr-media-server
     restart: unless-stopped
+    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 10 --access-logfile - --error-logfile - app:app
+    user: "1000:1000"
+    volumes:
+      - ./database:/database
+    environment:
+      - DROPPR_CACHE_DIR=/database/thumb-cache
+      - DROPPR_THUMB_MAX_CONCURRENCY=1
+      - DROPPR_PROXY_CACHE_DIR=/database/proxy-cache
+      - DROPPR_PROXY_MAX_CONCURRENCY=1
     depends_on:
       - app
+    networks:
+      - default
+
+  cloudflared-droppr:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-droppr
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflare/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflare/creds:/etc/cloudflared/creds:ro
+    depends_on:
+      - droppr
+    profiles:
+      - tunnel
     networks:
       - default
 
 networks:
   default:
     name: mri-cooling-droppr_default
-  mri-cooling_default:
-    external: true

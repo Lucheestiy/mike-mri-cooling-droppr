@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Droppr Analytics</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: rgba(30, 41, 59, 0.75);
+            --panel-solid: #1e293b;
+            --border: rgba(255, 255, 255, 0.12);
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --danger: #ef4444;
+            --success: #10b981;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: var(--bg);
+            background-image:
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            color: var(--text);
+        }
+
+        a { color: inherit; }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+        }
+
+        .title .sub {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+            justify-content: flex-end;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.75rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.18);
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        select, input[type="text"] {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 0.65rem 0.85rem;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: rgba(99, 102, 241, 0.65);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn {
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 12px;
+            padding: 0.68rem 0.95rem;
+            font-size: 0.95rem;
+            transition: transform 0.08s ease, background 0.15s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn.primary { background: var(--accent); color: white; }
+        .btn.primary:hover { background: var(--accent-hover); }
+        .btn.secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); color: var(--text); }
+        .btn.secondary:hover { background: rgba(255, 255, 255, 0.12); }
+        .btn:active { transform: translateY(1px); }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.25rem 1.5rem 3rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 1000px) {
+            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 560px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1rem 1rem;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 30px -18px rgba(0,0,0,0.55);
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            margin-top: 0.5rem;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .panel {
+            margin-top: 1rem;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+
+        .panel-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.18);
+        }
+
+        .panel-header-left {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .panel-header-right {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+            user-select: none;
+        }
+
+        .toggle input { accent-color: var(--accent); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: rgba(0,0,0,0.12);
+        }
+
+        tr:hover td { background: rgba(255,255,255,0.03); }
+
+        .mono { font-family: var(--mono); }
+        .muted { color: var(--muted); }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+
+        .tag.good { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.12); }
+        .tag.warn { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.12); }
+
+        .row-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .row-actions .btn { padding: 0.45rem 0.7rem; border-radius: 10px; font-size: 0.9rem; }
+
+        .status {
+            margin-top: 1rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .status.error { color: #fecaca; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            padding: 1.25rem;
+        }
+
+        .modal.show { display: block; }
+
+        .modal-card {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: rgba(15,23,42,0.98);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 25px 60px -20px rgba(0,0,0,0.75);
+        }
+
+        .modal-header {
+            padding: 1rem 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            letter-spacing: -0.02em;
+        }
+
+        .modal-body {
+            padding: 1rem 1.1rem 1.25rem;
+            max-height: calc(100vh - 190px);
+            overflow: auto;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            justify-content: flex-end;
+            border-top: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .close {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 12px;
+            cursor: pointer;
+            padding: 0.55rem 0.7rem;
+            font-weight: 700;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            .detail-grid { grid-template-columns: 1fr; }
+        }
+
+        .detail-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 0.9rem;
+        }
+
+        .detail-card .label { color: var(--muted); font-size: 0.9rem; }
+        .detail-card .value { margin-top: 0.4rem; font-size: 1.25rem; font-weight: 700; }
+
+        .section-title {
+            margin: 1.2rem 0 0.6rem;
+            font-size: 0.95rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-inner">
+            <div class="title">
+                <h1>Droppr Analytics</h1>
+                <div class="sub" id="rangeLabel">—</div>
+            </div>
+            <div class="controls">
+                <select id="rangeSelect" aria-label="Time range">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last 365 days</option>
+                    <option value="0">All time</option>
+                </select>
+                <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
+                <a class="btn primary" href="/settings/shares" target="_blank" rel="noopener">Manage Shares</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <div class="metric-label">Total Downloads</div>
+                <div class="metric-value" id="metricDownloads">—</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">ZIP Downloads</div>
+                <div class="metric-value" id="metricZip">—</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">File Downloads</div>
+                <div class="metric-value" id="metricFiles">—</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">Gallery Views</div>
+                <div class="metric-value" id="metricViews">—</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-header-left">
+                    <input type="text" id="searchInput" placeholder="Search by path or hash…" />
+                    <label class="toggle">
+                        <input type="checkbox" id="includeEmpty" checked />
+                        Show empty shares
+                    </label>
+                </div>
+                <div class="panel-header-right">
+                    <span class="chip" id="sharesCount">—</span>
+                </div>
+            </div>
+            <div style="overflow:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Share</th>
+                            <th>Downloads</th>
+                            <th>Views</th>
+                            <th>Unique IPs</th>
+                            <th>Last Activity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sharesBody">
+                        <tr><td colspan="6" class="muted">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <div class="modal" id="detailModal" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2 id="detailTitle">—</h2>
+                    <div class="muted" id="detailSub">—</div>
+                </div>
+                <button class="close" id="detailClose" type="button">Close</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-grid" id="detailMetrics"></div>
+
+                <div class="section-title">Downloads by IP</div>
+                <div class="panel" style="margin-top:0;">
+                    <div style="overflow:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>IP</th>
+                                    <th>Downloads</th>
+                                    <th>ZIP</th>
+                                    <th>Files</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ipsBody">
+                                <tr><td colspan="5" class="muted">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section-title">Recent Events</div>
+                <div class="panel" style="margin-top:0;">
+                    <div style="overflow:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>When</th>
+                                    <th>Type</th>
+                                    <th>IP</th>
+                                    <th>File</th>
+                                    <th>User Agent</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventsBody">
+                                <tr><td colspan="5" class="muted">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" id="exportCsvBtn" type="button">Export CSV</button>
+                <a class="btn primary" id="openGalleryBtn" href="#" target="_blank" rel="noopener">Open Gallery</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getJwtToken() {
+            try {
+                const t = localStorage.getItem('jwt');
+                return t ? String(t) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Prefer localStorage JWT, but fall back to cookie auth (FileBrowser sets `auth=` cookie).
+        const token = getJwtToken();
+
+        const els = {
+            rangeLabel: document.getElementById('rangeLabel'),
+            rangeSelect: document.getElementById('rangeSelect'),
+            refresh: document.getElementById('refreshBtn'),
+            search: document.getElementById('searchInput'),
+            includeEmpty: document.getElementById('includeEmpty'),
+            sharesBody: document.getElementById('sharesBody'),
+            sharesCount: document.getElementById('sharesCount'),
+            status: document.getElementById('status'),
+            metricDownloads: document.getElementById('metricDownloads'),
+            metricZip: document.getElementById('metricZip'),
+            metricFiles: document.getElementById('metricFiles'),
+            metricViews: document.getElementById('metricViews'),
+            modal: document.getElementById('detailModal'),
+            modalClose: document.getElementById('detailClose'),
+            detailTitle: document.getElementById('detailTitle'),
+            detailSub: document.getElementById('detailSub'),
+            detailMetrics: document.getElementById('detailMetrics'),
+            ipsBody: document.getElementById('ipsBody'),
+            eventsBody: document.getElementById('eventsBody'),
+            exportCsv: document.getElementById('exportCsvBtn'),
+            openGallery: document.getElementById('openGalleryBtn'),
+        };
+
+        const state = {
+            days: 30,
+            includeEmpty: true,
+            search: '',
+            shares: [],
+            selectedHash: null,
+        };
+
+        function fmtInt(n) {
+            if (n === null || n === undefined) return '—';
+            return Intl.NumberFormat().format(n);
+        }
+
+        function fmtTime(ts) {
+            if (!ts) return '—';
+            const d = new Date(ts * 1000);
+            return d.toLocaleString();
+        }
+
+        function showStatus(text, { error = false } = {}) {
+            els.status.textContent = text || '';
+            els.status.className = 'status' + (error ? ' error' : '');
+        }
+
+        function reportError(err) {
+            const message = err && err.message ? err.message : String(err || 'Unknown error');
+            showStatus(message, { error: true });
+        }
+
+        window.addEventListener('error', (e) => {
+            if (!e || !e.message) return;
+            reportError(new Error(e.message));
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            if (!e) return;
+            const reason = e.reason;
+            reportError(reason instanceof Error ? reason : new Error(String(reason || 'Unhandled promise rejection')));
+        });
+
+        async function apiJson(path) {
+            const headers = {};
+            if (token) headers['X-Auth'] = token;
+
+            const res = await fetch(path, {
+                headers,
+                cache: 'no-store',
+            });
+            if (res.status === 401) {
+                window.location.href = '/login?redirect=' + encodeURIComponent('/analytics');
+                return null;
+            }
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                throw new Error(`Request failed (${res.status}): ${text || res.statusText}`);
+            }
+            return await res.json();
+        }
+
+        function applyFilterAndRender() {
+            const q = state.search.trim().toLowerCase();
+            const filtered = state.shares.filter(s => {
+                if (!state.includeEmpty && (s.downloads === 0 && s.gallery_views === 0)) return false;
+                if (!q) return true;
+                return (s.hash || '').toLowerCase().includes(q) || (s.path || '').toLowerCase().includes(q);
+            });
+
+            els.sharesCount.textContent = `${fmtInt(filtered.length)} shares`;
+            els.sharesBody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                els.sharesBody.innerHTML = `<tr><td colspan="6" class="muted">No shares match your filters.</td></tr>`;
+                return;
+            }
+
+            for (const share of filtered) {
+                const shareLabel = share.path ? `<div>${escapeHtml(share.path)}</div><div class="muted mono">${escapeHtml(share.hash)}</div>`
+                                             : `<div class="mono">${escapeHtml(share.hash)}</div>`;
+                const deletedTag = share.deleted ? `<span class="tag warn">deleted</span>` : '';
+                const downloadsTag = share.downloads > 0 ? `<span class="tag good">${fmtInt(share.downloads)}</span>` : `<span class="tag">${fmtInt(share.downloads)}</span>`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${shareLabel}<div style="margin-top:0.35rem;">${deletedTag}</div></td>
+                    <td>${downloadsTag}<div class="muted" style="margin-top:0.25rem;">ZIP ${fmtInt(share.zip_downloads)} • Files ${fmtInt(share.file_downloads)}</div></td>
+                    <td>${fmtInt(share.gallery_views)}</td>
+                    <td>${fmtInt(share.unique_ips)}</td>
+                    <td>${fmtTime(share.last_seen)}</td>
+                    <td>
+                        <div class="row-actions">
+                            <a class="btn secondary" href="${share.url}" target="_blank" rel="noopener">Open</a>
+                            <button class="btn secondary" type="button" data-detail="${escapeHtml(share.hash)}">Details</button>
+                        </div>
+                    </td>
+                `;
+                els.sharesBody.appendChild(tr);
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setMetrics(totals) {
+            els.metricDownloads.textContent = fmtInt(totals.downloads ?? 0);
+            els.metricZip.textContent = fmtInt(totals.zip_downloads ?? 0);
+            els.metricFiles.textContent = fmtInt(totals.file_downloads ?? 0);
+            els.metricViews.textContent = fmtInt(totals.gallery_views ?? 0);
+        }
+
+        async function loadShares() {
+            showStatus('');
+            els.sharesBody.innerHTML = `<tr><td colspan="6" class="muted">Loading…</td></tr>`;
+            const days = state.days;
+            const includeEmpty = state.includeEmpty;
+            const data = await apiJson(`/api/analytics/shares?days=${encodeURIComponent(days)}&include_empty=${includeEmpty ? '1' : '0'}`);
+            if (!data) return;
+
+            state.shares = Array.isArray(data.shares) ? data.shares : [];
+            setMetrics(data.totals || {});
+
+            const since = data.range?.since;
+            const until = data.range?.until;
+            els.rangeLabel.textContent = since && until ? `${fmtTime(since)} → ${fmtTime(until)}` : '—';
+
+            applyFilterAndRender();
+        }
+
+        function openModal() {
+            els.modal.classList.add('show');
+        }
+
+        function closeModal() {
+            els.modal.classList.remove('show');
+            state.selectedHash = null;
+        }
+
+        function renderDetailMetrics(detail) {
+            const counts = detail.counts || {};
+            const downloads = (counts.file_download || 0) + (counts.zip_download || 0);
+            const views = counts.gallery_view || 0;
+
+            els.detailMetrics.innerHTML = `
+                <div class="detail-card"><div class="label">Downloads</div><div class="value">${fmtInt(downloads)}</div></div>
+                <div class="detail-card"><div class="label">ZIP Downloads</div><div class="value">${fmtInt(counts.zip_download || 0)}</div></div>
+                <div class="detail-card"><div class="label">File Downloads</div><div class="value">${fmtInt(counts.file_download || 0)}</div></div>
+                <div class="detail-card"><div class="label">Gallery Views</div><div class="value">${fmtInt(views)}</div></div>
+                <div class="detail-card"><div class="label">Unique IPs</div><div class="value">${fmtInt((detail.ips || []).length)}</div></div>
+                <div class="detail-card"><div class="label">Last Event</div><div class="value">${fmtTime((detail.events && detail.events[0] && detail.events[0].created_at) || null)}</div></div>
+            `;
+        }
+
+        function renderIps(detail) {
+            const ips = Array.isArray(detail.ips) ? detail.ips : [];
+            if (ips.length === 0) {
+                els.ipsBody.innerHTML = `<tr><td colspan="5" class="muted">No IP data (or IP logging disabled).</td></tr>`;
+                return;
+            }
+            els.ipsBody.innerHTML = '';
+            for (const row of ips) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="mono">${escapeHtml(row.ip)}</td>
+                    <td>${fmtInt(row.downloads)}</td>
+                    <td>${fmtInt(row.zip_downloads)}</td>
+                    <td>${fmtInt(row.file_downloads)}</td>
+                    <td>${fmtTime(row.last_seen)}</td>
+                `;
+                els.ipsBody.appendChild(tr);
+            }
+        }
+
+        function renderEvents(detail) {
+            const events = Array.isArray(detail.events) ? detail.events : [];
+            if (events.length === 0) {
+                els.eventsBody.innerHTML = `<tr><td colspan="5" class="muted">No events yet.</td></tr>`;
+                return;
+            }
+            els.eventsBody.innerHTML = '';
+            for (const ev of events.slice(0, 200)) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${fmtTime(ev.created_at)}</td>
+                    <td class="mono">${escapeHtml(ev.event_type)}</td>
+                    <td class="mono">${escapeHtml(ev.ip || '')}</td>
+                    <td class="mono">${escapeHtml(ev.file_path || '')}</td>
+                    <td class="muted">${escapeHtml(ev.user_agent || '')}</td>
+                `;
+                els.eventsBody.appendChild(tr);
+            }
+        }
+
+        async function loadShareDetail(shareHash) {
+            showStatus('');
+            state.selectedHash = shareHash;
+            els.detailTitle.textContent = 'Loading…';
+            els.detailSub.textContent = '';
+            els.ipsBody.innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`;
+            els.eventsBody.innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`;
+            openModal();
+
+            const detail = await apiJson(`/api/analytics/shares/${encodeURIComponent(shareHash)}?days=${encodeURIComponent(state.days)}`);
+            if (!detail) return;
+
+            const share = detail.share || {};
+            els.detailTitle.textContent = share.path ? `${share.path}` : `${share.hash}`;
+            els.detailSub.textContent = share.path ? share.hash : '';
+            els.openGallery.href = share.url || `/gallery/${shareHash}`;
+
+            renderDetailMetrics(detail);
+            renderIps(detail);
+            renderEvents(detail);
+        }
+
+        async function exportCsv(hash) {
+            const headers = {};
+            if (token) headers['X-Auth'] = token;
+
+            const res = await fetch(`/api/analytics/shares/${encodeURIComponent(hash)}/export.csv?days=${encodeURIComponent(state.days)}`, {
+                headers,
+                cache: 'no-store',
+            });
+            if (res.status === 401) {
+                window.location.href = '/login?redirect=' + encodeURIComponent('/analytics');
+                return;
+            }
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                throw new Error(`Export failed (${res.status}): ${text || res.statusText}`);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `droppr-share-${hash}-analytics.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // Event wiring
+        els.rangeSelect.addEventListener('change', () => {
+            state.days = parseInt(els.rangeSelect.value, 10);
+            loadShares().catch(reportError);
+        });
+
+        els.refresh.addEventListener('click', () => loadShares().catch(reportError));
+
+        // Debounced search
+        let searchTimeout = null;
+        els.search.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                state.search = els.search.value;
+                applyFilterAndRender();
+            }, 150);
+        });
+
+        els.includeEmpty.addEventListener('change', () => {
+            state.includeEmpty = els.includeEmpty.checked;
+            loadShares().catch(reportError);
+        });
+
+        els.sharesBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-detail]');
+            if (!btn) return;
+            const hash = btn.getAttribute('data-detail');
+            if (!hash) return;
+            loadShareDetail(hash).catch(reportError);
+        });
+
+        els.modalClose.addEventListener('click', closeModal);
+        els.modal.addEventListener('click', (e) => {
+            if (e.target === els.modal) closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        els.exportCsv.addEventListener('click', () => {
+            if (!state.selectedHash) return;
+            exportCsv(state.selectedHash).catch(reportError);
+        });
+
+        loadShares().catch(reportError);
+    </script>
+</body>
+</html>

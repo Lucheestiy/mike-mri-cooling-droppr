@@ -1,0 +1,740 @@
+<!-- VERSION: 1.4.0 - Stable MP4 sources + HD upgrade -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Video Player</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        }
+
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0.75rem 0.75rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0));
+            z-index: 10;
+        }
+
+        .left {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .title {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .title .name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60vw;
+        }
+
+        .title .sub {
+            font-size: 0.85rem;
+            opacity: 0.75;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60vw;
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            padding: 0.55rem 0.8rem;
+            border-radius: 12px;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .btn:active { transform: translateY(1px); }
+
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        @media (max-width: 600px) {
+            .actions .btn.secondary { display: none; }
+            .title .name, .title .sub { max-width: 50vw; }
+        }
+
+	        .player {
+	            height: 100%;
+	            display: flex;
+	            align-items: center;
+	            justify-content: center;
+	            padding: 0;
+	        }
+
+	        .statusbar {
+	            position: fixed;
+	            left: 0;
+	            right: 0;
+	            bottom: 0;
+	            padding: 0.6rem 0.75rem max(0.6rem, env(safe-area-inset-bottom, 0px));
+	            background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0));
+	            z-index: 10;
+	            pointer-events: none;
+	        }
+
+	        .statusbar .row {
+	            display: flex;
+	            gap: 0.75rem;
+	            align-items: center;
+	            justify-content: space-between;
+	            font-size: 0.85rem;
+	            opacity: 0.92;
+	        }
+
+	        .statusbar .lefttext {
+	            min-width: 0;
+	            overflow: hidden;
+	            white-space: nowrap;
+	            text-overflow: ellipsis;
+	        }
+
+	        .statusbar .righttext {
+	            white-space: nowrap;
+	            opacity: 0.9;
+	        }
+
+	        .statusbar .bar {
+	            margin-top: 0.4rem;
+	            height: 6px;
+	            border-radius: 999px;
+	            background: rgba(255,255,255,0.12);
+	            overflow: hidden;
+	        }
+
+	        .statusbar .fill {
+	            height: 100%;
+	            width: 0%;
+	            background: rgba(255,255,255,0.65);
+	        }
+
+	        video {
+	            width: 100%;
+	            height: 100%;
+	            max-height: 100vh;
+            background: #000;
+        }
+
+        .error {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            background: rgba(0,0,0,0.9);
+            z-index: 20;
+        }
+
+        .error.show { display: flex; }
+        .error h2 { margin: 0 0 0.5rem; }
+        .error p { margin: 0.25rem 0; opacity: 0.85; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="left">
+            <a id="backLink" class="btn" href="#">← Back</a>
+            <div class="title">
+                <div id="fileName" class="name">Video</div>
+                <div id="fileSub" class="sub"></div>
+            </div>
+        </div>
+        <div class="actions">
+            <a id="downloadLink" class="btn secondary" href="#" download>⬇ Download</a>
+            <a id="openLink" class="btn secondary" href="#" target="_blank" rel="noopener">↗ Open</a>
+            <button id="qualityBtn" class="btn" type="button" title="Quality mode">Auto</button>
+            <button id="reloadBtn" class="btn" type="button">⟳ Reload</button>
+        </div>
+    </div>
+
+	    <div class="player">
+	        <video id="video" controls playsinline preload="metadata"></video>
+	    </div>
+
+	    <div id="statusBar" class="statusbar" aria-live="polite">
+	        <div class="row">
+	            <div id="bufferText" class="lefttext">Loading…</div>
+	            <div id="timeText" class="righttext"></div>
+	        </div>
+	        <div class="bar"><div id="bufferFill" class="fill"></div></div>
+	    </div>
+
+	    <div id="error" class="error" role="dialog" aria-modal="true" aria-label="Error">
+	        <div>
+	            <h2 id="errorTitle">Could not load video</h2>
+	            <p id="errorMessage">Please go back and try again.</p>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        function encodePath(p) {
+            return String(p || '').split('/').map(s => encodeURIComponent(s)).join('/');
+        }
+
+        function safeRelPath(value) {
+            if (value == null) return null;
+            value = String(value);
+            if (value.startsWith('/') || value.startsWith('\\')) return null;
+            if (value.includes('\\')) return null;
+            const parts = value.split('/').filter(Boolean);
+            if (!parts.length) return null;
+            if (parts.some(p => p === '..')) return null;
+            return parts.join('/');
+        }
+
+        function showError(title, message) {
+            document.getElementById('errorTitle').textContent = title || 'Error';
+            document.getElementById('errorMessage').textContent = message || '';
+            document.getElementById('error').classList.add('show');
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const share = (params.get('share') || '').trim();
+        const file = (params.get('file') || '').trim();
+
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(share)) {
+            showError('Invalid link', 'Missing or invalid share hash.');
+            return;
+        }
+
+        const safeFile = safeRelPath(file);
+        if (!safeFile) {
+            showError('Invalid link', 'Missing or invalid file path.');
+            return;
+        }
+
+        const fileName = safeFile.split('/').pop() || safeFile;
+        document.title = fileName + ' - Droppr';
+        document.getElementById('fileName').textContent = fileName;
+        const fileSubEl = document.getElementById('fileSub');
+        fileSubEl.textContent = share;
+
+        const sourcesApiUrl = `/api/share/${share}/video-sources/${encodePath(safeFile)}`;
+        const originalInlineUrlDefault = `/api/public/dl/${share}/${encodePath(safeFile)}?inline=true`;
+        const downloadUrl = `/api/share/${share}/file/${encodePath(safeFile)}?download=1`;
+        const backUrl = `/gallery/${share}`;
+
+        const video = document.getElementById('video');
+        const bufferText = document.getElementById('bufferText');
+        const timeText = document.getElementById('timeText');
+        const bufferFill = document.getElementById('bufferFill');
+        const backLink = document.getElementById('backLink');
+        const downloadLink = document.getElementById('downloadLink');
+        const openLink = document.getElementById('openLink');
+        const qualityBtn = document.getElementById('qualityBtn');
+        const reloadBtn = document.getElementById('reloadBtn');
+
+        backLink.href = backUrl;
+        downloadLink.href = downloadUrl;
+        downloadLink.download = fileName;
+        openLink.href = originalInlineUrlDefault;
+
+        const QUALITY_MODES = ['auto', 'hd', 'fast'];
+        const QUALITY_LABEL = { auto: 'Auto', hd: 'HD', fast: 'Fast' };
+
+        let qualityMode = (params.get('quality') || 'auto').trim().toLowerCase();
+        if (!QUALITY_MODES.includes(qualityMode)) qualityMode = 'auto';
+
+        const sources = {
+            original: { url: originalInlineUrlDefault, size: null },
+            fast: { url: null, ready: false, size: null },
+            hd: { url: null, ready: false, size: null },
+        };
+
+        let activeSource = null; // 'fast' | 'hd' | 'original'
+        let switchInProgress = false;
+        let stallTimer = null;
+        let statusTimer = null;
+        let sourceLoadStartedAt = 0;
+        let sourcesPollTimer = null;
+        let sourcesPollStartedAt = 0;
+        let sourcesPollInFlight = false;
+        let lastHdFailureAt = 0;
+        let hdPrepareInFlight = false;
+
+        const AUTO_STALL_FALLBACK_MS = 3500;
+        const HD_FAILURE_COOLDOWN_MS = 15000;
+        const SOURCES_POLL_MS = 2000;
+        const SOURCES_POLL_MAX_MS = 10 * 60 * 1000;
+
+        function formatTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+            const s = Math.floor(seconds);
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            return `${m}:${String(sec).padStart(2, '0')}`;
+        }
+
+        function formatBytes(bytes) {
+            if (!Number.isFinite(bytes) || bytes < 0) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let v = bytes;
+            let i = 0;
+            while (v >= 1024 && i < units.length - 1) {
+                v /= 1024;
+                i++;
+            }
+            const digits = v >= 100 || i === 0 ? 0 : (v >= 10 ? 1 : 2);
+            return `${v.toFixed(digits)} ${units[i]}`;
+        }
+
+        function sourceLabel(sourceType) {
+            if (sourceType === 'hd') return 'HD';
+            if (sourceType === 'fast') return 'Fast';
+            return 'Original';
+        }
+
+        function setOpenLinkForSource(sourceType) {
+            const src = sources[sourceType] && sources[sourceType].url;
+            openLink.href = src || sources.original.url || originalInlineUrlDefault;
+        }
+
+        function updateQualityUI() {
+            const modeLabel = QUALITY_LABEL[qualityMode] || 'Auto';
+            const srcLabel = activeSource ? sourceLabel(activeSource) : '';
+            qualityBtn.textContent = modeLabel;
+
+            const sizeBytes =
+                (activeSource && sources[activeSource] && sources[activeSource].size) ||
+                sources.original.size ||
+                null;
+
+            let sub = `${share} • ${modeLabel}`;
+            if (srcLabel) sub += `: ${srcLabel}`;
+            if (sizeBytes) sub += ` • ${formatBytes(sizeBytes)}`;
+            fileSubEl.textContent = sub;
+
+            setOpenLinkForSource(activeSource || 'original');
+        }
+
+        function getStateLabel() {
+            if (video.error) return 'Error';
+            if (video.seeking) return 'Seeking';
+
+            const elapsed = Date.now() - (sourceLoadStartedAt || 0);
+            if (video.readyState === 0 && elapsed > 2000) {
+                if (activeSource === 'fast') return 'Loading fast preview…';
+                if (activeSource === 'hd') return 'Loading HD…';
+                return 'Loading original…';
+            }
+
+            if (!video.paused && video.readyState < 3) return 'Buffering';
+            if (!video.paused) return 'Playing';
+            if (video.currentTime > 0) return 'Paused';
+            if (video.readyState >= 2) return 'Ready';
+            return 'Loading';
+        }
+
+        function getBufferedInfo() {
+            const dur = Number.isFinite(video.duration) ? video.duration : null;
+            const ct = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+
+            const ranges = [];
+            try {
+                const b = video.buffered;
+                for (let i = 0; i < b.length; i++) {
+                    const start = b.start(i);
+                    const end = b.end(i);
+                    if (Number.isFinite(start) && Number.isFinite(end) && end > start) ranges.push([start, end]);
+                }
+            } catch (e) {}
+
+            let total = 0;
+            for (const [s, e] of ranges) total += (e - s);
+
+            let ahead = 0;
+            for (const [s, e] of ranges) {
+                if (ct >= s && ct <= e) {
+                    ahead = Math.max(0, e - ct);
+                    break;
+                }
+            }
+
+            const pct = (dur && dur > 0) ? Math.max(0, Math.min(1, total / dur)) : null;
+            return { dur, ct, pct, ahead };
+        }
+
+        function updateStatusUI() {
+            const state = getStateLabel();
+            const info = getBufferedInfo();
+
+            timeText.textContent = info.dur ? `${formatTime(info.ct)} / ${formatTime(info.dur)}` : formatTime(info.ct);
+
+            const modeLabel = QUALITY_LABEL[qualityMode] || 'Auto';
+            const srcLabel = activeSource ? sourceLabel(activeSource) : '';
+            let text = srcLabel ? `${modeLabel} • ${srcLabel} • ${state}` : `${modeLabel} • ${state}`;
+
+            if (info.pct != null) {
+                const pctText = Math.round(info.pct * 100);
+                text += ` • Buffered ${pctText}%`;
+                if (info.ahead > 0) text += ` • Ahead ${Math.round(info.ahead)}s`;
+                bufferFill.style.width = `${Math.max(0, Math.min(100, info.pct * 100)).toFixed(1)}%`;
+            } else {
+                bufferFill.style.width = '0%';
+            }
+
+            if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready && hdPrepareInFlight) {
+                text += ' • Preparing HD…';
+            }
+
+            bufferText.textContent = text;
+        }
+
+        function startStatusTimer() {
+            if (statusTimer) return;
+            statusTimer = setInterval(updateStatusUI, 500);
+        }
+
+        function stopStatusTimer() {
+            if (!statusTimer) return;
+            clearInterval(statusTimer);
+            statusTimer = null;
+        }
+
+        function appendCacheBust(url, cacheBust) {
+            if (!cacheBust) return url;
+            const sep = url.includes('?') ? '&' : '?';
+            return url + sep + 'v=' + Date.now();
+        }
+
+        function getUrlForSource(sourceType, cacheBust) {
+            const base = sources[sourceType] && sources[sourceType].url;
+            if (!base) return null;
+            return appendCacheBust(base, cacheBust);
+        }
+
+        function pickPlayableSource(desired) {
+            if (desired === 'hd' && sources.hd.ready) return 'hd';
+            if (desired === 'fast' && sources.fast.ready) return 'fast';
+            if (sources.fast.ready) return 'fast';
+            return 'original';
+        }
+
+        function clearTimers() {
+            if (stallTimer) clearTimeout(stallTimer);
+            stallTimer = null;
+        }
+
+        function setSource(sourceType, opts) {
+            const options = opts || {};
+            const targetTime = Number.isFinite(options.time) ? Math.max(0, options.time) : null;
+            const shouldPlay = !!options.shouldPlay;
+            const cacheBust = !!options.cacheBust;
+
+            const src = getUrlForSource(sourceType, cacheBust);
+            if (!src) {
+                showError('Could not load video', 'Missing source URL.');
+                return;
+            }
+
+            switchInProgress = true;
+            clearTimers();
+            activeSource = sourceType;
+            sourceLoadStartedAt = Date.now();
+            updateQualityUI();
+
+            const currentTimeBefore = video.currentTime || 0;
+
+            function done() {
+                switchInProgress = false;
+                updateQualityUI();
+            }
+
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            updateStatusUI();
+
+            video.addEventListener(
+                'loadedmetadata',
+                () => {
+                    try {
+                        if (targetTime != null) {
+                            const dur = Number.isFinite(video.duration) ? video.duration : null;
+                            video.currentTime = dur ? Math.min(targetTime, Math.max(0, dur - 0.25)) : targetTime;
+                        }
+                    } catch (e) {}
+
+                    if (shouldPlay) {
+                        video.play().catch(() => {});
+                    }
+                    done();
+                },
+                { once: true }
+            );
+
+            video.addEventListener(
+                'error',
+                () => {
+                    done();
+                    if (qualityMode === 'auto' && sourceType === 'hd') {
+                        lastHdFailureAt = Date.now();
+                        const t = Number.isFinite(targetTime) ? targetTime : currentTimeBefore;
+                        setSource(pickPlayableSource('fast'), { time: t, shouldPlay });
+                    }
+                },
+                { once: true }
+            );
+
+            video.src = src;
+            video.load();
+            startStatusTimer();
+            updateStatusUI();
+        }
+
+        async function fetchSources(options) {
+            const opts = options || {};
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            try {
+                const url = sourcesApiUrl + (sourcesApiUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+                let resp;
+                if (opts.prepareTargets && opts.prepareTargets.length) {
+                    resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prepare: opts.prepareTargets }),
+                        signal: controller.signal,
+                        cache: 'no-store',
+                    });
+                } else {
+                    resp = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+                }
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                return data;
+            } catch (e) {
+                return null;
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        function applySourcesData(data) {
+            if (!data || typeof data !== 'object') return;
+
+            if (data.original && typeof data.original === 'object') {
+                if (typeof data.original.url === 'string' && data.original.url) sources.original.url = data.original.url;
+                const s = Number(data.original.size);
+                if (Number.isFinite(s) && s > 0) sources.original.size = Math.floor(s);
+            }
+
+            if (data.fast && typeof data.fast === 'object') {
+                if (typeof data.fast.url === 'string' && data.fast.url) sources.fast.url = data.fast.url;
+                if (typeof data.fast.ready === 'boolean') sources.fast.ready = data.fast.ready;
+                const s = Number(data.fast.size);
+                sources.fast.size = Number.isFinite(s) && s > 0 ? Math.floor(s) : null;
+            }
+
+            if (data.hd && typeof data.hd === 'object') {
+                if (typeof data.hd.url === 'string' && data.hd.url) sources.hd.url = data.hd.url;
+                if (typeof data.hd.ready === 'boolean') sources.hd.ready = data.hd.ready;
+                const s = Number(data.hd.size);
+                sources.hd.size = Number.isFinite(s) && s > 0 ? Math.floor(s) : null;
+            }
+
+            updateQualityUI();
+            updateStatusUI();
+        }
+
+        function startSourcesPoller() {
+            if (sourcesPollTimer) return;
+            sourcesPollStartedAt = Date.now();
+            sourcesPollTimer = setInterval(async () => {
+                if (sourcesPollStartedAt && (Date.now() - sourcesPollStartedAt) > SOURCES_POLL_MAX_MS) {
+                    clearInterval(sourcesPollTimer);
+                    sourcesPollTimer = null;
+                    hdPrepareInFlight = false;
+                    updateStatusUI();
+                    return;
+                }
+                if (sourcesPollInFlight) return;
+                sourcesPollInFlight = true;
+                try {
+                    const beforeHd = sources.hd.ready;
+                    const data = await fetchSources();
+                    if (data) applySourcesData(data);
+                    const afterHd = sources.hd.ready;
+                    if (!beforeHd && afterHd) {
+                        hdPrepareInFlight = false;
+                        updateStatusUI();
+                        if ((qualityMode === 'auto' || qualityMode === 'hd') && !switchInProgress) {
+                            const shouldPlay = !video.paused;
+                            if (qualityMode === 'hd' || shouldPlay) {
+                                if (Date.now() - lastHdFailureAt > HD_FAILURE_COOLDOWN_MS) {
+                                    const attemptSwitch = () => {
+                                        if (switchInProgress) return;
+                                        if ((qualityMode !== 'auto' && qualityMode !== 'hd') || activeSource === 'hd') return;
+                                        if (video.seeking) return;
+                                        setSource('hd', { time: video.currentTime, shouldPlay: !video.paused });
+                                    };
+
+                                    if (video.seeking) setTimeout(attemptSwitch, 500);
+                                    else attemptSwitch();
+                                }
+                            }
+                        }
+                    }
+
+                    if (sources.hd.ready || qualityMode === 'fast') {
+                        clearInterval(sourcesPollTimer);
+                        sourcesPollTimer = null;
+                    }
+                } finally {
+                    sourcesPollInFlight = false;
+                }
+            }, SOURCES_POLL_MS);
+        }
+
+        async function ensurePrepared(targets) {
+            if (!targets || !targets.length) return;
+            if (targets.includes('hd')) hdPrepareInFlight = true;
+            updateStatusUI();
+            const data = await fetchSources({ prepareTargets: targets });
+            if (data) applySourcesData(data);
+            startSourcesPoller();
+        }
+
+        function scheduleStallFallback() {
+            if (qualityMode !== 'auto') return;
+            if (activeSource !== 'hd') return;
+            if (switchInProgress) return;
+            if (video.paused) return;
+
+            if (stallTimer) clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => {
+                if (qualityMode !== 'auto') return;
+                if (activeSource !== 'hd') return;
+                if (switchInProgress) return;
+                if (video.paused) return;
+
+                lastHdFailureAt = Date.now();
+                setSource(pickPlayableSource('fast'), { time: video.currentTime, shouldPlay: true });
+            }, AUTO_STALL_FALLBACK_MS);
+        }
+
+        function maybeUpgradeToHd() {
+            if (qualityMode !== 'auto') return;
+            if (activeSource === 'hd') return;
+            if (!sources.hd.ready) return;
+            if (Date.now() - lastHdFailureAt <= HD_FAILURE_COOLDOWN_MS) return;
+            if (switchInProgress) return;
+
+            const shouldPlay = !video.paused;
+            if (!shouldPlay) return;
+            setSource('hd', { time: video.currentTime, shouldPlay: true });
+        }
+
+        function loadInitial() {
+            startStatusTimer();
+            updateStatusUI();
+
+            fetchSources().then((data) => {
+                if (data) applySourcesData(data);
+
+                if (qualityMode === 'hd' && !sources.hd.ready) {
+                    ensurePrepared(['hd']);
+                } else if (qualityMode === 'fast' && !sources.fast.ready) {
+                    ensurePrepared(['fast']);
+                }
+
+                const desired = qualityMode === 'fast' ? 'fast' : 'hd';
+                setSource(pickPlayableSource(desired), { time: 0, shouldPlay: false });
+            });
+        }
+
+        function cycleQualityMode() {
+            const idx = QUALITY_MODES.indexOf(qualityMode);
+            const next = QUALITY_MODES[(idx + 1) % QUALITY_MODES.length];
+            qualityMode = next;
+
+            const t = video.currentTime;
+            const shouldPlay = !video.paused;
+            const desired = qualityMode === 'fast' ? 'fast' : 'hd';
+
+            if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready) ensurePrepared(['hd']);
+            if (qualityMode === 'fast' && !sources.fast.ready) ensurePrepared(['fast']);
+
+            setSource(pickPlayableSource(desired), { time: t, shouldPlay });
+        }
+
+        qualityBtn.onclick = () => cycleQualityMode();
+
+        reloadBtn.onclick = () => {
+            const t = video.currentTime;
+            const shouldPlay = !video.paused;
+            setSource(activeSource || pickPlayableSource(qualityMode === 'fast' ? 'fast' : 'hd'), {
+                time: t,
+                shouldPlay,
+                cacheBust: true,
+            });
+        };
+
+        video.addEventListener('play', () => {
+            if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready) ensurePrepared(['hd']);
+        });
+
+        video.addEventListener('playing', () => {
+            if (stallTimer) clearTimeout(stallTimer);
+            stallTimer = null;
+            if (qualityMode === 'auto') maybeUpgradeToHd();
+            updateStatusUI();
+        });
+        video.addEventListener('waiting', () => { scheduleStallFallback(); updateStatusUI(); });
+        video.addEventListener('stalled', () => { scheduleStallFallback(); updateStatusUI(); });
+        video.addEventListener('progress', updateStatusUI);
+        video.addEventListener('timeupdate', updateStatusUI);
+        video.addEventListener('pause', updateStatusUI);
+
+        video.addEventListener('error', () => {
+            if (qualityMode === 'auto' && activeSource === 'hd') return;
+            showError('Could not load video', 'Try Reload. If it keeps failing, go back to the gallery.');
+        });
+
+        window.addEventListener('beforeunload', () => stopStatusTimer());
+
+        loadInitial();
+
+    })();
+    </script>
+</body>
+</html>

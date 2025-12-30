@@ -26,7 +26,8 @@ fi
 echo "ok: Range $range_code"
 
 echo "Conditional GET $url"
-ims_code="$(curl -sS -o /dev/null -w '%{http_code}' -H 'If-Modified-Since: Sat, 01 Jan 2000 00:00:00 GMT' "$url")"
+# Use a tiny Range request so we don't download the whole file (especially important for large videos).
+ims_code="$(curl -sS -o /dev/null -w '%{http_code}' -H 'If-Modified-Since: Sat, 01 Jan 2000 00:00:00 GMT' -H 'Range: bytes=0-0' "$url")"
 if [[ "$ims_code" == "304" ]]; then
   echo "FAIL: got 304; some media clients can hang on replay when cached partials are reused" >&2
   exit 1

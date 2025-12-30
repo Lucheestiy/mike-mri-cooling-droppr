@@ -1,16 +1,14 @@
+<!-- VERSION: 1.6.0 - Video buffer progress indicator -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Shared Media Gallery</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-bg: rgba(30, 41, 59, 0.85);
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --accent-color: #6366f1;
@@ -25,29 +23,39 @@
             box-sizing: border-box;
             outline: none;
         }
-        
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
             background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+            background-image:
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%),
                 radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
             min-height: 100vh;
             color: var(--text-primary);
             overflow-x: hidden;
         }
-        
+
+        /* When the modal is open, hide the heavy background DOM to reduce memory/paint work on mobile. */
+        body.modal-open .header,
+        body.modal-open .gallery-container,
+        body.modal-open #backToTop {
+            display: none;
+        }
+
         /* Header */
         .header {
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 3rem 1.5rem 2rem;
+            padding-top: max(3rem, env(safe-area-inset-top, 0px));
+            padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+            padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
             position: relative;
             z-index: 10;
         }
-        
+
         .header h1 {
             font-size: 2.5rem;
             font-weight: 700;
@@ -57,7 +65,7 @@
             -webkit-text-fill-color: transparent;
             text-align: center;
         }
-        
+
         .header p {
             color: var(--text-secondary);
             font-size: 1.1rem;
@@ -67,8 +75,7 @@
 
         /* Controls Bar */
         .controls-bar {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 1rem;
@@ -136,6 +143,23 @@
             color: white;
         }
 
+        .filter-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.4em;
+            padding: 0.1em 0.4em;
+            margin-left: 0.4em;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+        }
+
+        .filter-btn.active .filter-badge {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .sort-select {
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -174,6 +198,14 @@
             background: rgba(255, 255, 255, 0.15);
         }
 
+        .action-btn.danger {
+            background: #dc2626;
+        }
+
+        .action-btn.danger:hover {
+            background: #b91c1c;
+        }
+
         /* Gallery Grid */
         .gallery-container {
             max-width: 1400px;
@@ -201,13 +233,14 @@
         .media-card {
             break-inside: avoid;
             background: var(--card-bg);
-            backdrop-filter: blur(5px);
             border-radius: 16px;
             overflow: hidden;
             margin-bottom: 1.5rem;
             border: 1px solid rgba(255, 255, 255, 0.05);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
+            content-visibility: auto;
+            contain-intrinsic-size: 320px;
         }
 
         .media-card:hover {
@@ -313,9 +346,9 @@
             inset: 0;
             z-index: 1000;
             background: var(--modal-bg);
-            backdrop-filter: blur(10px);
             opacity: 0;
             transition: opacity 0.3s ease;
+            overscroll-behavior: contain;
         }
 
         .modal.show {
@@ -342,9 +375,9 @@
         /* Immersive Mode */
         .modal.immersive {
             background: black;
-            cursor: none; /* Hide cursor by default */
+            cursor: none;
         }
-        
+
         .modal.immersive.active-user {
             cursor: default;
         }
@@ -361,6 +394,9 @@
             left: 0;
             right: 0;
             padding: 1.5rem;
+            padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+            padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+            padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -375,19 +411,21 @@
             left: 0;
             right: 0;
             padding: 2rem 1.5rem;
+            padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+            padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+            padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
             background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
             text-align: center;
             z-index: 10;
             transition: opacity 0.5s ease, transform 0.5s ease;
         }
-        
-        /* Hide controls in immersive mode unless active */
+
         .modal.immersive:not(.active-user) .modal-header {
             opacity: 0;
             transform: translateY(-20px);
             pointer-events: none;
         }
-        
+
         .modal.immersive:not(.active-user) .modal-footer {
             opacity: 0;
             transform: translateY(20px);
@@ -401,7 +439,7 @@
 
         .modal-controls {
             display: flex;
-            gap: 1rem;
+            gap: 0.5rem;
         }
 
         .icon-btn {
@@ -424,6 +462,15 @@
             transform: scale(1.05);
         }
 
+        .icon-btn.danger {
+            background: rgba(220, 38, 38, 0.8);
+            border-color: rgba(220, 38, 38, 0.9);
+        }
+
+        .icon-btn.danger:hover {
+            background: rgba(185, 28, 28, 1);
+        }
+
         .nav-btn {
             position: absolute;
             top: 50%;
@@ -438,7 +485,7 @@
             border-radius: 50%;
             margin: 0 1rem;
         }
-        
+
         .nav-btn:hover {
             background: rgba(255, 255, 255, 0.2);
         }
@@ -460,7 +507,7 @@
             text-align: center;
             padding: 4rem;
         }
-        
+
         .spinner {
             width: 50px;
             height: 50px;
@@ -470,8 +517,294 @@
             animation: spin 1s linear infinite;
             margin: 0 auto 1rem;
         }
-        
+
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Video Overlay - Fullscreen clickable overlay for stuck videos */
+        .video-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            cursor: pointer;
+        }
+
+        .video-overlay.show {
+            display: flex;
+        }
+
+        .video-overlay-content {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .video-overlay-content .spinner {
+            width: 60px;
+            height: 60px;
+        }
+
+        .video-overlay-content p {
+            margin-top: 1.5rem;
+            font-size: 1.3rem;
+            color: white;
+        }
+
+        .video-overlay-content .hint {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Skeleton Loading */
+        .skeleton-grid {
+            column-count: 4;
+            column-gap: 1.5rem;
+        }
+        @media (max-width: 1200px) { .skeleton-grid { column-count: 3; } }
+        @media (max-width: 900px) { .skeleton-grid { column-count: 2; } }
+        @media (max-width: 600px) { .skeleton-grid { column-count: 1; } }
+
+        .skeleton-card {
+            break-inside: avoid;
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .skeleton-preview {
+            height: 200px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        .skeleton-info {
+            padding: 1rem;
+        }
+
+        .skeleton-title {
+            height: 1.2rem;
+            width: 70%;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-bottom: 0.75rem;
+            animation: shimmer 1.5s infinite;
+        }
+
+        .skeleton-meta {
+            height: 0.9rem;
+            width: 50%;
+            background: rgba(255,255,255,0.07);
+            border-radius: 4px;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* Error States */
+        .error-state {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .error-state .error-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .error-state h3 {
+            color: #ef4444;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-state .retry-btn {
+            margin-top: 1.5rem;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .error-state .retry-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Help Overlay */
+        .help-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .help-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .help-content {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .help-content h2 {
+            margin: 0 0 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .help-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .help-section h3 {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+
+        .shortcut-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .shortcut-key {
+            display: inline-flex;
+            gap: 0.25rem;
+        }
+
+        .shortcut-key kbd {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 0.25rem 0.5rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        /* Offline Banner */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+            text-align: center;
+            font-weight: 600;
+            z-index: 4000;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .offline-banner.show {
+            transform: translateY(0);
+        }
+
+        /* List View Layout */
+        .media-grid.list-view {
+            column-count: 1 !important;
+        }
+
+        .media-grid.list-view .media-card {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .media-grid.list-view .media-preview-container {
+            width: 120px;
+            min-width: 120px;
+            height: 80px;
+            border-radius: 12px 0 0 12px;
+        }
+
+        .media-grid.list-view .media-preview {
+            height: 80px;
+        }
+
+        .media-grid.list-view .media-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+        }
+
+        .media-grid.list-view .media-title {
+            flex: 1;
+        }
+
+        .media-grid.list-view .media-meta {
+            margin: 0 1rem;
+        }
+
+        .media-grid.list-view .card-actions {
+            margin: 0;
+        }
+
+        /* Layout Toggle Button */
+        .layout-toggle {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 0.25rem;
+        }
+
+        .layout-toggle button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .layout-toggle button.active {
+            background: var(--accent-color);
+            color: white;
+        }
 
         /* Toast */
         .toast {
@@ -492,7 +825,7 @@
             transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             z-index: 2000;
         }
-        
+
         .toast.show {
             transform: translateY(0);
             opacity: 1;
@@ -503,7 +836,6 @@
             font-size: 1.2rem;
         }
 
-        /* SVG Icons helpers */
         .icon { width: 1em; height: 1em; fill: currentColor; }
 
         .empty-state {
@@ -578,23 +910,38 @@
     </style>
 </head>
 <body>
+    <!-- Offline Banner -->
+    <div id="offlineBanner" class="offline-banner">
+        <span>📡</span>
+        <span>You're offline. Some features may be unavailable.</span>
+    </div>
+
+    <!-- Video Stuck Overlay - Fullscreen clickable -->
+    <div id="videoOverlay" class="video-overlay">
+        <div class="video-overlay-content">
+            <div class="spinner"></div>
+            <p id="overlayMessage">Video is loading...</p>
+            <p class="hint">Tap anywhere to reload video</p>
+        </div>
+    </div>
+
     <div class="header">
         <h1>Shared Media Gallery</h1>
         <p>Viewing files shared via Droppr</p>
-        
+
         <div class="controls-bar">
             <div class="search-box">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="searchInput" placeholder="Search files...">
-            </div>
-            
-            <div class="filter-group">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="image">Images</button>
-                <button class="filter-btn" data-filter="video">Videos</button>
+                <span class="search-icon" aria-hidden="true">🔍</span>
+                <input type="text" id="searchInput" placeholder="Search files..." aria-label="Search files">
             </div>
 
-            <select class="sort-select" id="sortSelect">
+            <div class="filter-group" role="group" aria-label="Filter by media type">
+                <button class="filter-btn active" data-filter="all" aria-pressed="true">All <span class="filter-badge" id="countAll">0</span></button>
+                <button class="filter-btn" data-filter="image" aria-pressed="false">Images <span class="filter-badge" id="countImages">0</span></button>
+                <button class="filter-btn" data-filter="video" aria-pressed="false">Videos <span class="filter-badge" id="countVideos">0</span></button>
+            </div>
+
+            <select class="sort-select" id="sortSelect" aria-label="Sort files">
                 <option value="type_asc">Type (Images first)</option>
                 <option value="type_desc">Type (Videos first)</option>
                 <option value="name_asc">Name (A-Z)</option>
@@ -603,49 +950,63 @@
                 <option value="size_asc">Size (Smallest)</option>
             </select>
 
-            <button class="action-btn secondary" id="copyLinkBtn">
-                🔗 Share
-            </button>
-            
-            <a href="#" id="downloadAllBtn" class="action-btn">
-                ⬇️ Download All
-            </a>
+            <div class="layout-toggle" id="layoutToggle" role="group" aria-label="Layout options">
+                <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view">▦</button>
+                <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
+            </div>
+
+            <button class="action-btn secondary" id="copyLinkBtn">🔗 Share</button>
+            <button class="action-btn secondary" id="refreshBtn" title="Refresh. Shift+click = hard reload">🔄 Refresh</button>
+            <a href="#" id="downloadAllBtn" class="action-btn">⬇️ Download All</a>
         </div>
     </div>
-    
+
     <div class="gallery-container">
         <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>Loading gallery...</p>
+            <div class="skeleton-grid">
+                <div class="skeleton-card"><div class="skeleton-preview"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+                <div class="skeleton-card"><div class="skeleton-preview" style="height:280px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+                <div class="skeleton-card"><div class="skeleton-preview" style="height:160px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+                <div class="skeleton-card"><div class="skeleton-preview" style="height:220px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+            </div>
         </div>
-        
+
+        <div id="errorState" class="error-state" style="display: none;">
+            <div class="error-icon">⚠️</div>
+            <h3 id="errorTitle">Failed to load gallery</h3>
+            <p id="errorMessage">Please check your connection and try again.</p>
+            <button class="retry-btn" onclick="location.reload()">Try Again</button>
+        </div>
+
         <div id="galleryGrid" class="media-grid"></div>
-        
+
         <div id="emptyState" class="empty-state" style="display: none;">
-            <h3>No files found</h3>
-            <p>Try adjusting your search or filters</p>
+            <h3 id="emptyTitle">No files found</h3>
+            <p id="emptyMessage">Try adjusting your search or filters</p>
         </div>
     </div>
 
     <!-- Modal -->
-    <div id="modal" class="modal">
+    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-label="Media viewer">
         <div class="modal-header">
             <div class="modal-controls">
                 <button class="icon-btn" id="zoomBtn" title="Zoom">🔍</button>
                 <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
                 <button class="icon-btn" id="slideshowBtn" title="Slideshow">▶</button>
+                <button class="icon-btn" id="speedBtn" title="Playback speed" style="display:none;">1x</button>
+                <button class="icon-btn danger" id="resetVideoBtn" title="Reset video (if stuck)" style="display:none;">⟳</button>
+                <a href="#" class="icon-btn" id="downloadBtn" download title="Download">⬇</a>
                 <a href="#" class="icon-btn" id="viewOriginalBtn" target="_blank" title="View Original">↗</a>
+                <button class="icon-btn" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
             </div>
             <button class="icon-btn" id="closeBtn" title="Close">×</button>
         </div>
-        
-        <button class="nav-btn nav-prev" id="prevBtn">❮</button>
-        <button class="nav-btn nav-next" id="nextBtn">❯</button>
-        
-        <div class="modal-content-wrapper" id="modalContent">
-            <!-- Media injected here -->
-        </div>
-        
+
+        <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous">❮</button>
+        <button class="nav-btn nav-next" id="nextBtn" aria-label="Next">❯</button>
+
+        <div class="modal-content-wrapper" id="modalContent"></div>
+
         <div class="modal-footer">
             <h3 id="modalTitle">Filename</h3>
             <p id="modalMeta">Meta info</p>
@@ -660,109 +1021,595 @@
 
     <button id="backToTop" class="back-to-top" title="Back to Top">↑</button>
 
+    <!-- Help Overlay -->
+    <div id="helpOverlay" class="help-overlay" role="dialog" aria-modal="true">
+        <div class="help-content">
+            <h2>Keyboard Shortcuts <button class="icon-btn" id="closeHelpBtn">×</button></h2>
+            <div class="help-section">
+                <h3>Navigation</h3>
+                <div class="shortcut-row"><span>Previous/Next</span><span class="shortcut-key"><kbd>←</kbd> <kbd>→</kbd></span></div>
+                <div class="shortcut-row"><span>Close viewer</span><span class="shortcut-key"><kbd>Esc</kbd></span></div>
+            </div>
+            <div class="help-section">
+                <h3>Video</h3>
+                <div class="shortcut-row"><span>Reset stuck video</span><span class="shortcut-key"><kbd>R</kbd></span></div>
+                <div class="shortcut-row"><span>Kill all connections</span><span class="shortcut-key"><kbd>K</kbd></span></div>
+            </div>
+            <div class="help-section">
+                <h3>Other</h3>
+                <div class="shortcut-row"><span>Toggle slideshow</span><span class="shortcut-key"><kbd>Space</kbd></span></div>
+                <div class="shortcut-row"><span>Show this help</span><span class="shortcut-key"><kbd>?</kbd></span></div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // State
-        const state = {
-            files: [],
-            filteredFiles: [],
-            currentIndex: 0,
-            // Robust extraction: remove empty segments and 'gallery', take the last one
-            shareHash: new URLSearchParams(window.location.search).get('share') || 
-                       window.location.pathname.split('/').filter(p => p && p !== 'gallery').pop(),
+    (function() {
+        'use strict';
+
+        // ============ CONFIGURATION ============
+        const CONFIG = {
+            STUCK_TIMEOUT: 6000,      // Show "stuck" message after 6 seconds
+            SEEK_TIMEOUT: 8000,       // Show "seek stuck" after 8 seconds
+            MAX_PRELOAD_CACHE: 15,    // Max cached images
+            SLIDESHOW_INTERVAL: 4000  // 4 seconds per slide
+        };
+
+        // ============ BROWSER DETECTION ============
+        const UA = navigator.userAgent || '';
+        const IS_IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+
+        // ============ STATE ============
+	        const state = {
+	            files: [],
+	            filteredFiles: [],
+	            currentIndex: 0,
+            shareHash: null,
             filter: 'all',
-            sort: 'type_asc', // Default sort by type
+            sort: 'type_asc',
+            layout: 'grid',
             search: '',
             isSlideshow: false,
             slideshowInterval: null,
             isZoomed: false,
             immersiveTimer: null,
-            touchStartX: 0,
-            touchEndX: 0,
-            // Zoom & Pan State
-            panStartX: 0,
-            panStartY: 0,
-            panX: 0,
-            panY: 0,
-            isPanning: false
-        };
+            touchStartX: null,
+            isOffline: !navigator.onLine,
+	            videoTimers: {
+	                stuck: null,
+	                wait: null,
+	                seek: null,
+	                stall: null
+	            },
+	            videoStatusInterval: null,
+	            scrollLockY: 0
+	        };
 
-        // DOM Elements
-        const els = {
-            grid: document.getElementById('galleryGrid'),
-            loading: document.getElementById('loading'),
-            empty: document.getElementById('emptyState'),
-            search: document.getElementById('searchInput'),
-            sort: document.getElementById('sortSelect'),
-            filters: document.querySelectorAll('.filter-btn'),
-            modal: document.getElementById('modal'),
-            modalContent: document.getElementById('modalContent'),
-            modalTitle: document.getElementById('modalTitle'),
-            modalMeta: document.getElementById('modalMeta'),
-            downloadAll: document.getElementById('downloadAllBtn'),
-            copyLink: document.getElementById('copyLinkBtn'),
-            backToTop: document.getElementById('backToTop'),
-            viewOriginal: document.getElementById('viewOriginalBtn')
-        };
+        // ============ DOM ELEMENTS ============
+        const els = {};
 
-        // Initialize
-        async function init() {
-            if (!state.shareHash || state.shareHash === 'gallery') {
-                showToast('Invalid share link', 'error');
-                return;
-            }
+        function initElements() {
+            els.grid = document.getElementById('galleryGrid');
+            els.loading = document.getElementById('loading');
+            els.empty = document.getElementById('emptyState');
+            els.emptyTitle = document.getElementById('emptyTitle');
+            els.emptyMessage = document.getElementById('emptyMessage');
+            els.error = document.getElementById('errorState');
+            els.errorTitle = document.getElementById('errorTitle');
+            els.errorMessage = document.getElementById('errorMessage');
+            els.search = document.getElementById('searchInput');
+            els.sort = document.getElementById('sortSelect');
+            els.filters = document.querySelectorAll('.filter-btn');
+            els.modal = document.getElementById('modal');
+            els.modalContent = document.getElementById('modalContent');
+            els.modalTitle = document.getElementById('modalTitle');
+            els.modalMeta = document.getElementById('modalMeta');
+            els.downloadAll = document.getElementById('downloadAllBtn');
+            els.copyLink = document.getElementById('copyLinkBtn');
+            els.refresh = document.getElementById('refreshBtn');
+            els.backToTop = document.getElementById('backToTop');
+            els.viewOriginal = document.getElementById('viewOriginalBtn');
+            els.download = document.getElementById('downloadBtn');
+            els.videoOverlay = document.getElementById('videoOverlay');
+            els.overlayMessage = document.getElementById('overlayMessage');
+            els.speedBtn = document.getElementById('speedBtn');
+            els.resetVideoBtn = document.getElementById('resetVideoBtn');
+            els.helpOverlay = document.getElementById('helpOverlay');
+            els.offlineBanner = document.getElementById('offlineBanner');
+        }
 
-            // Scroll listener for Back to Top
-            window.addEventListener('scroll', () => {
-                if (window.scrollY > 500) {
-                    els.backToTop.classList.add('show');
-                } else {
-                    els.backToTop.classList.remove('show');
-                }
-            });
+        // ============ PREFERENCES ============
+        const PREFS_KEY = 'droppr_gallery_prefs';
 
-            els.backToTop.addEventListener('click', () => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-
-            // Setup download link
-            els.downloadAll.href = `/api/share/${state.shareHash}/download`;
-
-            // Load data
+        function loadPrefs() {
             try {
-                const res = await fetch(`/api/share/${state.shareHash}/files`);
-                if (!res.ok) throw new Error('Failed to load files');
-                state.files = await res.json();
-                filterAndRender();
-            } catch (err) {
-                console.error(err);
-                els.loading.innerHTML = `<p style="color: #ef4444">Failed to load gallery. Please try again.</p>`;
+                return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+            } catch { return {}; }
+        }
+
+        function savePrefs(prefs) {
+            try {
+                localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...prefs }));
+            } catch {}
+        }
+
+        // ============ UTILITY FUNCTIONS ============
+        function encodePath(p) {
+            return String(p || '').split('/').map(s => encodeURIComponent(s)).join('/');
+        }
+
+        function formatSize(b) {
+            if (!b) return '0 B';
+            const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(b) / Math.log(k));
+            return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // Prevent the underlying page from scrolling while the modal is open.
+        // This avoids expensive repaint work (and perceived "freezing") on some devices,
+        // especially while a video is playing.
+        function lockPageScroll() {
+            if (document.body.classList.contains('modal-open')) return;
+            state.scrollLockY = window.scrollY || 0;
+            document.body.classList.add('modal-open');
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${state.scrollLockY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+        }
+
+        function unlockPageScroll() {
+            if (!document.body.classList.contains('modal-open')) return;
+            document.body.classList.remove('modal-open');
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            const y = state.scrollLockY || 0;
+            state.scrollLockY = 0;
+            window.scrollTo(0, y);
+        }
+
+        // ============ VIDEO MANAGEMENT ============
+        // Central video cleanup - clears everything
+        function clearAllVideoTimers() {
+            if (!state.videoTimers) return;
+            for (const key of Object.keys(state.videoTimers)) {
+                const t = state.videoTimers[key];
+                if (t) clearTimeout(t);
+                state.videoTimers[key] = null;
             }
         }
 
-        // Filtering & Sorting
+	        function destroyVideo() {
+	            clearAllVideoTimers();
+	            if (state.videoStatusInterval) {
+	                clearInterval(state.videoStatusInterval);
+	                state.videoStatusInterval = null;
+	            }
+	            hideVideoOverlay();
+
+            const video = els.modalContent.querySelector('video');
+            if (video) {
+                // Remove all event listeners by cloning
+                const events = ['loadstart', 'waiting', 'canplaythrough', 'playing',
+                               'error', 'stalled', 'seeking', 'seeked', 'abort', 'ended'];
+                events.forEach(e => video['on' + e] = null);
+
+                try { video.pause(); } catch(e) {}
+                video.src = '';
+                video.load();
+                video.remove();
+            }
+        }
+
+        function killAllConnections() {
+            destroyVideo();
+            showToast('Connections reset');
+        }
+
+        function showVideoOverlay(message) {
+            els.overlayMessage.textContent = message;
+            els.videoOverlay.classList.add('show');
+        }
+
+        function hideVideoOverlay() {
+            els.videoOverlay.classList.remove('show');
+        }
+
+        function reloadCurrentVideo() {
+            destroyVideo();
+            setTimeout(() => {
+                updateModalContent();
+                showToast('Video reloaded');
+            }, 200);
+        }
+
+        // Overlay click handler - set up in setupEventHandlers after DOM ready
+
+        // ============ MODAL CONTENT ============
+        const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+        let currentSpeedIndex = 2;
+
+	        function updateModalContent() {
+	            const file = state.filteredFiles[state.currentIndex];
+            if (!file) {
+                closeModal();
+                return;
+            }
+
+            destroyVideo();
+            els.modalContent.innerHTML = '';
+
+            const path = file.path || file.name;
+            const inlineUrl = file.inline_url || `/api/public/dl/${state.shareHash}/${encodePath(path)}?inline=true`;
+            const previewUrl = `/api/share/${state.shareHash}/preview/${encodePath(path)}?v=${file.size || 0}`;
+            const downloadUrl = file.download_url || `/api/share/${state.shareHash}/file/${encodePath(path)}?download=1`;
+
+            els.modalTitle.textContent = file.name;
+            els.modalMeta.textContent = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file.size)}`;
+            els.viewOriginal.href = inlineUrl;
+            els.download.href = downloadUrl;
+            els.download.download = file.name;
+
+	            if (file.type === 'video') {
+	                els.speedBtn.style.display = 'inline-flex';
+	                els.resetVideoBtn.style.display = 'inline-flex';
+	                createVideoPlayer(inlineUrl, previewUrl, file);
+	            } else {
+                els.speedBtn.style.display = 'none';
+                els.resetVideoBtn.style.display = 'none';
+
+                if (file.type === 'image') {
+                    els.modalContent.innerHTML = `<img class="modal-media" src="${inlineUrl}" alt="${file.name}">`;
+                } else {
+                    els.modalContent.innerHTML = `
+                        <div style="text-align:center;padding:2rem;">
+                            <div style="font-size:4rem;margin-bottom:1rem;">${getFileIcon(file.extension)}</div>
+                            <p>Preview not available</p>
+                            <a href="${downloadUrl}" class="action-btn" style="margin-top:1rem;display:inline-flex;">⬇️ Download</a>
+                        </div>`;
+                }
+            }
+        }
+
+	        function createVideoPlayer(videoUrl, posterUrl, file) {
+	            const container = document.createElement('div');
+	            container.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;';
+
+            const video = document.createElement('video');
+            video.className = 'modal-media';
+            video.controls = true;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+            video.poster = posterUrl;
+            video.innerHTML = `<source src="${videoUrl}">`;
+
+	            container.appendChild(video);
+	            els.modalContent.appendChild(container);
+
+	            // Update footer with buffered/download progress for the current video.
+	            if (state.videoStatusInterval) {
+	                clearInterval(state.videoStatusInterval);
+	                state.videoStatusInterval = null;
+	            }
+
+	            function updateVideoMeta() {
+	                const base = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file?.size || 0)}`;
+
+	                const dur = Number.isFinite(video.duration) ? video.duration : null;
+	                if (!dur || dur <= 0) {
+	                    els.modalMeta.textContent = base;
+	                    return;
+	                }
+
+	                let bufferedTotal = 0;
+	                let bufferedAhead = 0;
+	                const ct = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+	                try {
+	                    const b = video.buffered;
+	                    for (let i = 0; i < b.length; i++) {
+	                        const s = b.start(i);
+	                        const e = b.end(i);
+	                        if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+	                        bufferedTotal += (e - s);
+	                        if (ct >= s && ct <= e) bufferedAhead = Math.max(bufferedAhead, e - ct);
+	                    }
+	                } catch (e) {}
+
+	                const pct = Math.max(0, Math.min(1, bufferedTotal / dur));
+	                const pctText = Math.round(pct * 100);
+
+	                let extra = ` • Buffered ${pctText}%`;
+	                const size = Number(file?.size || 0);
+	                if (Number.isFinite(size) && size > 0) {
+	                    extra += ` (≈${formatSize(size * pct)} / ${formatSize(size)})`;
+	                }
+	                if (bufferedAhead > 0) extra += ` • Ahead ${Math.round(bufferedAhead)}s`;
+
+	                els.modalMeta.textContent = base + extra;
+	            }
+
+	            updateVideoMeta();
+	            state.videoStatusInterval = setInterval(updateVideoMeta, 500);
+	            video.addEventListener('progress', updateVideoMeta);
+	            video.addEventListener('timeupdate', updateVideoMeta);
+	            video.addEventListener('loadedmetadata', updateVideoMeta);
+	            video.addEventListener('seeking', updateVideoMeta);
+	            video.addEventListener('seeked', updateVideoMeta);
+
+	            // Set playback rate
+	            video.playbackRate = speeds[currentSpeedIndex];
+
+            // Track loading state
+            let isStuck = false;
+            let hasPlayed = false;
+
+            // Stuck detection timer
+            if (state.videoTimers.stuck) clearTimeout(state.videoTimers.stuck);
+            state.videoTimers.stuck = setTimeout(() => {
+                if (!hasPlayed && !video.paused) {
+                    isStuck = true;
+                    showVideoOverlay('Video stuck - tap anywhere to reload');
+                }
+            }, CONFIG.STUCK_TIMEOUT);
+
+            // Event handlers
+            video.onplaying = () => {
+                hasPlayed = true;
+                isStuck = false;
+                hideVideoOverlay();
+                clearAllVideoTimers();
+            };
+
+            video.oncanplaythrough = () => {
+                hideVideoOverlay();
+            };
+
+            video.onwaiting = () => {
+                if (hasPlayed) {
+                    // Only show overlay if it's been playing then buffers
+                    if (state.videoTimers.wait) clearTimeout(state.videoTimers.wait);
+                    state.videoTimers.wait = setTimeout(() => {
+                        if (video.readyState < 3) {
+                            showVideoOverlay('Buffering... tap to reload if stuck');
+                        }
+                    }, CONFIG.STUCK_TIMEOUT);
+                }
+            };
+
+            video.onseeking = () => {
+                if (state.videoTimers.seek) clearTimeout(state.videoTimers.seek);
+                state.videoTimers.seek = setTimeout(() => {
+                    if (video.seeking) {
+                        showVideoOverlay('Seek stuck - tap anywhere to reload');
+                    }
+                }, CONFIG.SEEK_TIMEOUT);
+            };
+
+            video.onseeked = () => {
+                hideVideoOverlay();
+                if (state.videoTimers.seek) {
+                    clearTimeout(state.videoTimers.seek);
+                    state.videoTimers.seek = null;
+                }
+            };
+
+            video.onerror = () => {
+                hideVideoOverlay();
+                clearAllVideoTimers();
+                showToast('Video failed to load');
+            };
+
+            video.onstalled = () => {
+                if (state.videoTimers.stall) clearTimeout(state.videoTimers.stall);
+                state.videoTimers.stall = setTimeout(() => {
+                    if (video.readyState < 3) {
+                        showVideoOverlay('Video stalled - tap to reload');
+                    }
+                }, CONFIG.STUCK_TIMEOUT);
+            };
+        }
+
+        // Speed control
+        document.getElementById('speedBtn').onclick = () => {
+            currentSpeedIndex = (currentSpeedIndex + 1) % speeds.length;
+            const speed = speeds[currentSpeedIndex];
+            els.speedBtn.textContent = speed === 1 ? '1x' : speed + 'x';
+            const video = els.modalContent.querySelector('video');
+            if (video) video.playbackRate = speed;
+            showToast(`Speed: ${speed}x`);
+        };
+
+        // Reset video button
+        document.getElementById('resetVideoBtn').onclick = reloadCurrentVideo;
+
+        // ============ MODAL FUNCTIONS ============
+        function openModal(index) {
+            if (index < 0 || index >= state.filteredFiles.length) return;
+
+            state.currentIndex = index;
+            state.isZoomed = false;
+            document.getElementById('zoomBtn').textContent = '🔍';
+            if (state.isSlideshow) toggleSlideshow();
+
+            lockPageScroll();
+            els.modal.style.display = 'block';
+            els.modal.offsetHeight; // Force reflow
+            els.modal.classList.add('show');
+            updateModalContent();
+            resetImmersiveTimer();
+            maybePreloadAdjacentImages();
+        }
+        window.openModal = openModal;
+
+        // Open media with platform-aware defaults (iOS/WebKit can be more stable in a video-only page).
+        function openMedia(index, evt) {
+            const file = state.filteredFiles[index];
+            if (!file) return;
+
+            if (file.type === 'video') {
+                const path = file.path || file.name;
+                const url = `/player?share=${encodeURIComponent(state.shareHash)}&file=${encodeURIComponent(path)}`;
+
+                // Desktop escape hatch: Shift-click opens the in-gallery modal viewer instead of /player.
+                if (evt && evt.shiftKey) {
+                    openModal(index);
+                } else {
+                    window.location.href = url;
+                }
+                return;
+            }
+
+            openModal(index);
+        }
+        window.openMedia = openMedia;
+
+        function closeModal() {
+            destroyVideo();
+            if (state.isSlideshow) {
+                clearInterval(state.slideshowInterval);
+                state.isSlideshow = false;
+            }
+            clearTimeout(state.immersiveTimer);
+            els.modal.classList.remove('show', 'immersive');
+            setTimeout(() => {
+                if (els.modal.classList.contains('show')) return;
+                els.modal.style.display = 'none';
+                els.modalContent.innerHTML = '';
+                unlockPageScroll();
+            }, 300);
+        }
+
+        function navigate(direction) {
+            const newIndex = state.currentIndex + direction;
+            if (newIndex >= 0 && newIndex < state.filteredFiles.length) {
+                state.isZoomed = false;
+                document.getElementById('zoomBtn').textContent = '🔍';
+
+                const nextFile = state.filteredFiles[newIndex];
+                if (state.isSlideshow && nextFile?.type === 'video') {
+                    toggleSlideshow();
+                }
+
+                state.currentIndex = newIndex;
+                updateModalContent();
+                resetImmersiveTimer();
+                maybePreloadAdjacentImages();
+            }
+        }
+
+        function resetImmersiveTimer() {
+            els.modal.classList.add('active-user');
+            clearTimeout(state.immersiveTimer);
+            state.immersiveTimer = setTimeout(() => els.modal.classList.remove('active-user'), 3000);
+        }
+
+        // ============ IMAGE PRELOADING ============
+        const preloadCache = new Map();
+
+        function preloadImage(url) {
+            if (preloadCache.has(url)) return;
+            if (preloadCache.size >= CONFIG.MAX_PRELOAD_CACHE) {
+                const firstKey = preloadCache.keys().next().value;
+                preloadCache.delete(firstKey);
+            }
+            const img = new Image();
+            img.src = url;
+            preloadCache.set(url, img);
+        }
+
+        function preloadAdjacentImages() {
+            [-1, 1].forEach(offset => {
+                const i = state.currentIndex + offset;
+                if (i >= 0 && i < state.filteredFiles.length) {
+                    const file = state.filteredFiles[i];
+                    if (file.type === 'image') {
+                        const path = file.path || file.name;
+                        const url = file.inline_url || `/api/public/dl/${state.shareHash}/${encodePath(path)}?inline=true`;
+                        preloadImage(url);
+                    }
+                }
+            });
+        }
+
+        function maybePreloadAdjacentImages() {
+            const current = state.filteredFiles[state.currentIndex];
+            if (current?.type !== 'image') return;
+            preloadAdjacentImages();
+        }
+
+        // ============ FILE ICON ============
+        function getFileIcon(ext) {
+            const e = (ext || '').toLowerCase();
+            const icons = {
+                pdf: '📕', doc: '📄', docx: '📄', txt: '📝',
+                xls: '📊', xlsx: '📊', csv: '📊',
+                ppt: '📽️', pptx: '📽️',
+                zip: '📦', rar: '📦', '7z': '📦',
+                mp3: '🎵', wav: '🎵', flac: '🎵',
+                html: '🌐', css: '🎨', js: '⚙️', json: '📋',
+                py: '🐍', java: '☕',
+            };
+            return icons[e] || '📄';
+        }
+
+        // ============ GALLERY FUNCTIONS ============
+        async function fetchFiles(forceRefresh = false) {
+            const params = new URLSearchParams();
+            if (forceRefresh) params.set('refresh', '1');
+            params.set('v', Date.now());
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+
+            try {
+                const res = await fetch(
+                    `/api/share/${state.shareHash}/files?${params}`,
+                    { cache: 'no-store', signal: controller.signal }
+                );
+                if (!res.ok) throw new Error(`Failed: ${res.status}`);
+                state.files = await res.json();
+                filterAndRender();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
         function filterAndRender() {
             els.loading.style.display = 'none';
-            
+            els.error.style.display = 'none';
+
+            // Update counts
+            const searchLower = state.search.toLowerCase();
+            const matching = state.files.filter(f => f.name.toLowerCase().includes(searchLower));
+            document.getElementById('countAll').textContent = matching.length;
+            document.getElementById('countImages').textContent = matching.filter(f => f.type === 'image').length;
+            document.getElementById('countVideos').textContent = matching.filter(f => f.type === 'video').length;
+
             // Filter
             state.filteredFiles = state.files.filter(file => {
                 const matchesType = state.filter === 'all' || file.type === state.filter;
-                const matchesSearch = file.name.toLowerCase().includes(state.search.toLowerCase());
+                const matchesSearch = file.name.toLowerCase().includes(searchLower);
                 return matchesType && matchesSearch;
             });
 
             // Sort
             state.filteredFiles.sort((a, b) => {
-                switch(state.sort) {
-                    case 'type_asc': 
-                        // Images first, then videos, then others
-                        const typeScore = (t) => t === 'image' ? 1 : (t === 'video' ? 2 : 3);
-                        const typeDiff = typeScore(a.type) - typeScore(b.type);
-                        return typeDiff !== 0 ? typeDiff : a.name.localeCompare(b.name);
-                    case 'type_desc': 
-                        // Videos first, then images, then others
-                        const typeScoreDesc = (t) => t === 'video' ? 1 : (t === 'image' ? 2 : 3);
-                        const typeDiffDesc = typeScoreDesc(a.type) - typeScoreDesc(b.type);
-                        return typeDiffDesc !== 0 ? typeDiffDesc : a.name.localeCompare(b.name);
+                const typeScore = t => t === 'image' ? 1 : (t === 'video' ? 2 : 3);
+                switch (state.sort) {
+                    case 'type_asc': return typeScore(a.type) - typeScore(b.type) || a.name.localeCompare(b.name);
+                    case 'type_desc': return typeScore(b.type) - typeScore(a.type) || a.name.localeCompare(b.name);
                     case 'name_asc': return a.name.localeCompare(b.name);
                     case 'name_desc': return b.name.localeCompare(a.name);
                     case 'size_asc': return a.size - b.size;
@@ -776,14 +1623,16 @@
 
         function renderGrid() {
             els.grid.innerHTML = '';
-            
+
             if (state.filteredFiles.length === 0) {
+                els.emptyTitle.textContent = state.files.length === 0 ? 'This share is empty' : 'No files found';
+                els.emptyMessage.textContent = state.files.length === 0 ? 'No files have been shared yet.' : 'Try adjusting your search or filters';
                 els.empty.style.display = 'block';
                 return;
             }
-            
+
             els.empty.style.display = 'none';
-            
+
             state.filteredFiles.forEach((file, index) => {
                 const card = document.createElement('div');
                 card.className = 'media-card';
@@ -793,390 +1642,352 @@
         }
 
         function createCardHTML(file, index) {
-            // Use file.path if available (new backend), fall back to file.name
             const path = file.path || file.name;
-            const fileUrl = `/api/share/${state.shareHash}/file/${encodeURIComponent(path)}`;
+            const inlineUrl = file.inline_url || `/api/public/dl/${state.shareHash}/${encodePath(path)}?inline=true`;
+            const downloadUrl = file.download_url || `/api/share/${state.shareHash}/file/${encodePath(path)}?download=1`;
+            const previewUrl = `/api/share/${state.shareHash}/preview/${encodePath(path)}?v=${file.size || 0}`;
             const isVideo = file.type === 'video';
             const isImage = file.type === 'image';
-            
+
             let preview = '';
             if (isImage) {
-                preview = `<img class="media-preview" src="${fileUrl}" loading="lazy" alt="${file.name}" onerror="this.parentElement.innerHTML='<div class=\'file-placeholder\'>⚠️ Image Error</div>'">`;
+                // Use server-generated thumbnails for grid/list previews to keep memory usage low on mobile.
+                preview = `<img class="media-preview" src="${previewUrl}" data-fallback="${inlineUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${file.name}"
+                             onerror="this.onerror=null;this.src=this.dataset.fallback;">`;
             } else if (isVideo) {
                 preview = `
-                    <div class="media-preview-container">
-                        <div class="file-placeholder" style="background: #000;">
-                            <video src="${fileUrl}#t=0.1" preload="metadata" style="width:100%; height:100%; object-fit:cover;"></video>
-                        </div>
-                        <div class="play-icon">▶</div>
+                    <img class="media-preview" src="${previewUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${file.name}"
+                         style="object-fit:cover;height:200px;width:100%;"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <div class="file-placeholder" style="background:#000;display:none;height:200px;align-items:center;justify-content:center;">
+                        <div style="font-size:2.75rem">🎞️</div>
                     </div>
-                `;
+                    <div class="play-icon">▶</div>`;
             } else {
-                preview = `
-                    <div class="file-placeholder">
-                        <div style="font-size: 3rem; margin-bottom: 1rem">📄</div>
-                        <div>${file.extension.toUpperCase()}</div>
-                    </div>
-                `;
+                preview = `<div class="file-placeholder">${getFileIcon(file.extension)} ${file.extension.toUpperCase()}</div>`;
             }
 
-            const tag = isVideo ? '<div class="media-tag">Video</div>' : (isImage ? '<div class="media-tag">Image</div>' : '');
+            const tag = isVideo ? 'Video' : (isImage ? 'Image' : 'File');
 
             return `
-                <div class="media-preview-container" onclick="openModal(${index})">
-                    ${tag}
+                <div class="media-preview-container" onclick="openMedia(${index}, event)">
+                    <div class="media-tag">${tag}</div>
                     ${preview}
                 </div>
                 <div class="media-info">
-                    <div class="media-title" title="${file.name}">${file.name}</div>
-                    <div class="media-meta">
-                        <span>${file.extension.toUpperCase()}</span>
-                        <span>${formatSize(file.size)}</span>
-                    </div>
+                    <div class="media-title">${file.name}</div>
+                    <div class="media-meta"><span>${file.extension.toUpperCase()}</span><span>${formatSize(file.size)}</span></div>
                     <div class="card-actions">
-                        <button class="card-btn primary" onclick="openModal(${index})">
-                            ${isVideo ? 'Play' : 'View'}
-                        </button>
-                        <a href="${fileUrl}" download="${file.name}" class="card-btn">
-                            Download
-                        </a>
+                        <button class="card-btn primary" onclick="openMedia(${index}, event)">${isVideo ? 'Play' : 'View'}</button>
+                        <a href="${downloadUrl}" download="${file.name}" class="card-btn">⬇</a>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
-        // Modal Functions
-        window.openModal = function(index) {
-            state.currentIndex = index;
-            els.modal.style.display = 'block';
-            // Force reflow for transition
-            els.modal.offsetHeight;
-            els.modal.classList.add('show');
-            updateModalContent();
-            resetImmersiveTimer();
-            
-            // Add swipe listeners when modal opens
-            els.modal.addEventListener('touchstart', handleTouchStart, {passive: true});
-            els.modal.addEventListener('touchend', handleTouchEnd, {passive: true});
-        };
-
-        function updateModalContent() {
-            const file = state.filteredFiles[state.currentIndex];
-            const path = file.path || file.name;
-            const fileUrl = `/api/share/${state.shareHash}/file/${encodeURIComponent(path)}`;
-            
-            els.modalTitle.textContent = file.name;
-            els.modalMeta.textContent = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file.size)}`;
-            
-            // Update View Original Link
-            els.viewOriginal.href = fileUrl;
-
-            els.modalContent.innerHTML = '';
-            
-            if (file.type === 'video') {
-                els.modalContent.innerHTML = `
-                    <video class="modal-media" controls autoplay playsinline>
-                        <source src="${fileUrl}" type="video/${file.extension === 'mov' ? 'quicktime' : 'mp4'}">
-                        Your browser does not support video.
-                    </video>
-                `;
-            } else if (file.type === 'image') {
-                els.modalContent.innerHTML = `
-                    <img class="modal-media" src="${fileUrl}" alt="${file.name}">
-                `;
-            } else {
-                els.modalContent.innerHTML = `
-                    <div style="text-align: center; color: white;">
-                        <div style="font-size: 5rem; margin-bottom: 2rem">📄</div>
-                        <p>Preview not available for this file type.</p>
-                        <a href="${fileUrl}" class="action-btn" style="margin-top: 1rem; display: inline-block;">Download File</a>
-                    </div>
-                `;
-            }
-
-            // Update nav buttons
-            document.getElementById('prevBtn').style.display = state.currentIndex > 0 ? 'block' : 'none';
-            document.getElementById('nextBtn').style.display = state.currentIndex < state.filteredFiles.length - 1 ? 'block' : 'none';
-        }
-
-        function closeModal() {
-            els.modal.classList.remove('show');
-            exitFullscreen(); // Ensure we exit browser fullscreen too
-            
-            // Remove swipe listeners
-            els.modal.removeEventListener('touchstart', handleTouchStart);
-            els.modal.removeEventListener('touchend', handleTouchEnd);
-
-            setTimeout(() => {
-                els.modal.style.display = 'none';
-                els.modalContent.innerHTML = ''; // Stop video playback
-                stopSlideshow();
-                state.isZoomed = false;
-                els.modal.classList.remove('immersive'); // Reset immersive state
-            }, 300);
-        }
-
-        function handleTouchStart(e) {
-            state.touchStartX = e.changedTouches[0].screenX;
-        }
-
-        function handleTouchEnd(e) {
-            state.touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        }
-
-        function handleSwipe() {
-            const threshold = 50;
-            if (state.touchEndX < state.touchStartX - threshold) {
-                navigate(1); // Swipe left, go next
-            }
-            if (state.touchEndX > state.touchStartX + threshold) {
-                navigate(-1); // Swipe right, go prev
-            }
-        }
-
-        function navigate(dir) {
-            const newIndex = state.currentIndex + dir;
-            if (newIndex >= 0 && newIndex < state.filteredFiles.length) {
-                state.currentIndex = newIndex;
-                updateModalContent();
-                resetImmersiveTimer();
-            }
-        }
-
-        // Utilities
-        function formatSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMessage').textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
+        // ============ SLIDESHOW ============
         function toggleSlideshow() {
+            state.isSlideshow = !state.isSlideshow;
+            document.getElementById('slideshowBtn').textContent = state.isSlideshow ? '⏸' : '▶';
+
             if (state.isSlideshow) {
-                stopSlideshow();
-            } else {
-                startSlideshow();
-            }
-        }
-
-        function startSlideshow() {
-            state.isSlideshow = true;
-            document.getElementById('slideshowBtn').innerHTML = '⏸';
-            showToast('Slideshow started');
-            state.slideshowInterval = setInterval(() => {
-                if (state.currentIndex < state.filteredFiles.length - 1) {
-                    navigate(1);
-                } else {
-                    state.currentIndex = 0;
-                    updateModalContent();
-                }
-            }, 3000);
-            
-            // Enter fullscreen automatically for slideshow
-            if (!document.fullscreenElement) {
-                toggleBrowserFullscreen();
-            }
-        }
-
-        function stopSlideshow() {
-            state.isSlideshow = false;
-            document.getElementById('slideshowBtn').innerHTML = '▶';
-            if (state.slideshowInterval) clearInterval(state.slideshowInterval);
-        }
-
-        // Fullscreen & Immersive Mode Logic
-        function toggleBrowserFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(e => console.log(e));
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        function exitFullscreen() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            }
-        }
-
-        // Monitor fullscreen change to toggle immersive mode class
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
                 els.modal.classList.add('immersive');
-                resetImmersiveTimer();
+                state.slideshowInterval = setInterval(() => {
+                    if (state.currentIndex < state.filteredFiles.length - 1) {
+                        navigate(1);
+                    } else {
+                        state.currentIndex = -1;
+                        navigate(1);
+                    }
+                }, CONFIG.SLIDESHOW_INTERVAL);
             } else {
+                clearInterval(state.slideshowInterval);
                 els.modal.classList.remove('immersive');
-                els.modal.classList.remove('active-user');
-                clearTimeout(state.immersiveTimer);
             }
-        });
-
-        // Immersive UI timer
-        function resetImmersiveTimer() {
-            if (!document.fullscreenElement) return;
-            
-            els.modal.classList.add('active-user');
-            clearTimeout(state.immersiveTimer);
-            
-            state.immersiveTimer = setTimeout(() => {
-                // Only hide if not hovering over controls directly (optional enhancement, simple timer for now)
-                els.modal.classList.remove('active-user');
-            }, 3000); // Hide after 3 seconds of inactivity
         }
 
-        // Event Listeners
-        els.search.addEventListener('input', (e) => {
-            state.search = e.target.value;
-            filterAndRender();
-        });
+        // ============ EVENT HANDLERS ============
+        function setupEventHandlers() {
+            // Video overlay click handler
+            els.videoOverlay.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                reloadCurrentVideo();
+            };
 
-        els.sort.addEventListener('change', (e) => {
-            state.sort = e.target.value;
-            filterAndRender();
-        });
+            // Search
+            let searchTimeout;
+            els.search.oninput = e => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    state.search = e.target.value;
+                    filterAndRender();
+                }, 150);
+            };
 
-        els.filters.forEach(btn => {
-            btn.addEventListener('click', () => {
-                els.filters.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                state.filter = btn.dataset.filter;
+            // Sort
+            els.sort.onchange = e => {
+                state.sort = e.target.value;
+                savePrefs({ sort: state.sort });
                 filterAndRender();
+            };
+
+            // Filters
+            els.filters.forEach(btn => {
+                btn.onclick = () => {
+                    els.filters.forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-pressed', 'true');
+                    state.filter = btn.dataset.filter;
+                    savePrefs({ filter: state.filter });
+                    filterAndRender();
+                };
             });
-        });
 
-        els.copyLink.addEventListener('click', () => {
-            navigator.clipboard.writeText(window.location.href);
-            showToast('Link copied to clipboard');
-        });
+            // Copy link
+            els.copyLink.onclick = () => {
+                navigator.clipboard.writeText(window.location.href);
+                showToast('Link copied');
+            };
 
-        document.getElementById('closeBtn').addEventListener('click', closeModal);
-        document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
-        document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
-        
-        document.getElementById('fullscreenBtn').addEventListener('click', toggleBrowserFullscreen);
-        document.getElementById('slideshowBtn').addEventListener('click', toggleSlideshow);
+            // Refresh
+            els.refresh.onclick = e => {
+                if (e.shiftKey) {
+                    killAllConnections();
+                    location.reload();
+                } else {
+                    fetchFiles(true).catch(console.error);
+                }
+            };
 
-        // Zoom & Pan Functions
-        function toggleZoom() {
-            const img = els.modalContent.querySelector('img');
-            if (!img) return;
-            
-            state.isZoomed = !state.isZoomed;
-            
-            if (state.isZoomed) {
-                img.style.transform = `scale(2.5) translate(0px, 0px)`;
-                img.style.cursor = 'grab';
-                img.style.transition = 'transform 0.3s ease';
-                state.panX = 0;
-                state.panY = 0;
-            } else {
-                img.style.transform = 'scale(1) translate(0px, 0px)';
-                img.style.cursor = 'zoom-in';
-                state.panX = 0;
-                state.panY = 0;
-            }
-        }
+            // Modal controls
+            document.getElementById('closeBtn').onclick = closeModal;
+            document.getElementById('prevBtn').onclick = () => navigate(-1);
+            document.getElementById('nextBtn').onclick = () => navigate(1);
+            document.getElementById('slideshowBtn').onclick = toggleSlideshow;
 
-        function startPan(e) {
-            if (!state.isZoomed) return;
-            e.preventDefault();
-            state.isPanning = true;
-            
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            
-            state.panStartX = clientX - state.panX;
-            state.panStartY = clientY - state.panY;
-            
-            const img = els.modalContent.querySelector('img');
-            if (img) {
-                img.style.cursor = 'grabbing';
-                img.style.transition = 'none'; // Disable transition for smooth dragging
-            }
-        }
+            // Zoom
+            document.getElementById('zoomBtn').onclick = () => {
+                state.isZoomed = !state.isZoomed;
+                const media = els.modalContent.querySelector('.modal-media');
+                if (media) {
+                    media.style.transform = state.isZoomed ? 'scale(1.5)' : 'scale(1)';
+                }
+                document.getElementById('zoomBtn').textContent = state.isZoomed ? '🔎' : '🔍';
+            };
 
-        function doPan(e) {
-            if (!state.isPanning || !state.isZoomed) return;
-            e.preventDefault();
-            
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            
-            state.panX = clientX - state.panStartX;
-            state.panY = clientY - state.panStartY;
-            
-            const img = els.modalContent.querySelector('img');
-            if (img) {
-                // Divide pan by scale to match 1:1 movement feel
-                img.style.transform = `scale(2.5) translate(${state.panX / 2.5}px, ${state.panY / 2.5}px)`;
-            }
-        }
+            // Fullscreen
+            document.getElementById('fullscreenBtn').onclick = () => {
+                if (!document.fullscreenElement) {
+                    els.modal.requestFullscreen?.();
+                    els.modal.classList.add('immersive');
+                } else {
+                    document.exitFullscreen?.();
+                    els.modal.classList.remove('immersive');
+                }
+            };
 
-        function endPan() {
-            state.isPanning = false;
-            const img = els.modalContent.querySelector('img');
-            if (img && state.isZoomed) {
-                img.style.cursor = 'grab';
-            }
-        }
+            // Layout toggle
+            const gridBtn = document.getElementById('gridViewBtn');
+            const listBtn = document.getElementById('listViewBtn');
+            gridBtn.onclick = () => {
+                state.layout = 'grid';
+                savePrefs({ layout: 'grid' });
+                els.grid.classList.remove('list-view');
+                gridBtn.classList.add('active');
+                listBtn.classList.remove('active');
+            };
+            listBtn.onclick = () => {
+                state.layout = 'list';
+                savePrefs({ layout: 'list' });
+                els.grid.classList.add('list-view');
+                listBtn.classList.add('active');
+                gridBtn.classList.remove('active');
+            };
 
-        document.getElementById('zoomBtn').addEventListener('click', toggleZoom);
+            // Back to top
+            window.addEventListener('scroll', () => {
+                els.backToTop.classList.toggle('show', window.scrollY > 500);
+            });
+            els.backToTop.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        // Mouse movement in modal resets immersive timer
-        els.modal.addEventListener('mousemove', resetImmersiveTimer);
-        
-        // Modal Event Delegation for Panning
-        els.modalContent.addEventListener('mousedown', startPan);
-        els.modalContent.addEventListener('touchstart', startPan, {passive: false});
-        
-        window.addEventListener('mousemove', doPan);
-        window.addEventListener('touchmove', doPan, {passive: false});
-        
-        window.addEventListener('mouseup', endPan);
-        window.addEventListener('touchend', endPan);
+            // Help
+            document.getElementById('helpBtn').onclick = () => els.helpOverlay.classList.add('show');
+            document.getElementById('closeHelpBtn').onclick = () => els.helpOverlay.classList.remove('show');
+            els.helpOverlay.onclick = e => { if (e.target === els.helpOverlay) els.helpOverlay.classList.remove('show'); };
 
-        els.modal.addEventListener('click', (e) => {
-            // Prevent closing if panning occurred (simple check) or if clicking actual controls
-            if (state.isPanning) return;
-            
-            if(e.target === els.modal || e.target.classList.contains('modal-content-wrapper')) {
-                 // Toggle controls visibility on click/tap
-                 if (document.fullscreenElement) {
-                     els.modal.classList.toggle('active-user');
-                     if (els.modal.classList.contains('active-user')) {
-                         resetImmersiveTimer();
-                     } else {
-                         clearTimeout(state.immersiveTimer);
-                     }
-                 }
-            }
-        });
+            // Keyboard shortcuts
+            document.addEventListener('keydown', e => {
+                // Help
+                if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+                    e.preventDefault();
+                    els.helpOverlay.classList.toggle('show');
+                    return;
+                }
 
-        // Keyboard support
-        document.addEventListener('keydown', (e) => {
-            if (els.modal.style.display === 'block') {
-                if (e.key === 'Escape') closeModal(); // Browser handles fullscreen exit on ESC usually, but this closes modal
+                if (e.key === 'Escape') {
+                    if (els.helpOverlay.classList.contains('show')) {
+                        els.helpOverlay.classList.remove('show');
+                    } else if (els.modal.style.display === 'block') {
+                        closeModal();
+                    }
+                    return;
+                }
+
+                // Kill connections
+                if (e.key === 'k' || e.key === 'K') {
+                    e.preventDefault();
+                    killAllConnections();
+                    return;
+                }
+
+                // Reset video
+                if ((e.key === 'r' || e.key === 'R') && els.modal.style.display === 'block') {
+                    const file = state.filteredFiles[state.currentIndex];
+                    if (file?.type === 'video') {
+                        e.preventDefault();
+                        reloadCurrentVideo();
+                    }
+                    return;
+                }
+
+                // Modal navigation
+                if (els.modal.style.display !== 'block') return;
+
                 if (e.key === 'ArrowLeft') navigate(-1);
-                if (e.key === 'ArrowRight') navigate(1);
-                if (e.key === ' ') {
+                else if (e.key === 'ArrowRight') navigate(1);
+                else if (e.key === ' ' && state.filteredFiles[state.currentIndex]?.type !== 'video') {
                     e.preventDefault();
                     toggleSlideshow();
                 }
-                
-                resetImmersiveTimer();
-            }
-        });
+            });
 
-        init();
+            // Touch swipe - only for non-video
+            els.modalContent.addEventListener('touchstart', e => {
+                const current = state.filteredFiles[state.currentIndex];
+                if (current?.type === 'video') {
+                    state.touchStartX = null;
+                    return;
+                }
+                if (e.target.tagName === 'VIDEO' || e.target.closest('video')) {
+                    state.touchStartX = null;
+                    return;
+                }
+                state.touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            els.modalContent.addEventListener('touchend', e => {
+                if (state.touchStartX === null) return;
+                const current = state.filteredFiles[state.currentIndex];
+                if (current?.type === 'video') return;
+                if (e.target.tagName === 'VIDEO' || e.target.closest('video')) return;
+
+                const diff = state.touchStartX - e.changedTouches[0].screenX;
+                if (Math.abs(diff) > 50) navigate(diff > 0 ? 1 : -1);
+            }, { passive: true });
+
+            // Mouse movement for immersive
+            els.modal.addEventListener('mousemove', resetImmersiveTimer);
+
+            // Page visibility - pause video when hidden
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && els.modal.style.display === 'block') {
+                    const video = els.modalContent.querySelector('video');
+                    if (video) video.pause();
+                }
+            });
+
+            // Before unload - cleanup
+            window.addEventListener('beforeunload', () => {
+                destroyVideo();
+                preloadCache.clear();
+            });
+
+            // Online/offline
+            window.addEventListener('online', () => {
+                state.isOffline = false;
+                els.offlineBanner.classList.remove('show');
+                if (state.files.length === 0) fetchFiles(true).catch(console.error);
+            });
+            window.addEventListener('offline', () => {
+                state.isOffline = true;
+                els.offlineBanner.classList.add('show');
+            });
+
+            // Fullscreen change
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) els.modal.classList.remove('immersive');
+            });
+        }
+
+        // ============ INITIALIZATION ============
+        async function init() {
+            initElements();
+
+            // Get share hash
+            state.shareHash = new URLSearchParams(window.location.search).get('share') ||
+                             window.location.pathname.split('/').filter(p => p && p !== 'gallery').pop();
+
+            if (!state.shareHash || state.shareHash === 'gallery') {
+                els.loading.style.display = 'none';
+                els.errorTitle.textContent = 'Invalid share link';
+                els.errorMessage.textContent = 'Please use a valid Droppr share link.';
+                els.error.style.display = 'block';
+                return;
+            }
+
+            // Load preferences
+            const prefs = loadPrefs();
+            state.filter = prefs.filter || 'all';
+            state.sort = prefs.sort || 'type_asc';
+            const isSmallScreen = window.matchMedia?.('(max-width: 900px)')?.matches;
+            state.layout = prefs.layout || ((IS_IOS || isSmallScreen) ? 'list' : 'grid');
+
+            // Apply preferences
+            els.sort.value = state.sort;
+            els.filters.forEach(b => {
+                const isActive = b.dataset.filter === state.filter;
+                b.classList.toggle('active', isActive);
+                b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+            if (state.layout === 'list') {
+                els.grid.classList.add('list-view');
+                document.getElementById('listViewBtn').classList.add('active');
+                document.getElementById('gridViewBtn').classList.remove('active');
+            }
+
+            // Setup handlers
+            setupEventHandlers();
+
+            // Set download all link
+            els.downloadAll.href = `/api/share/${state.shareHash}/download`;
+
+            // Check online status
+            if (state.isOffline) {
+                els.offlineBanner.classList.add('show');
+            }
+
+            // Fetch files
+            try {
+                await fetchFiles();
+            } catch (err) {
+                console.error(err);
+                els.loading.style.display = 'none';
+                els.errorTitle.textContent = 'Failed to load gallery';
+                els.errorMessage.textContent = err.message || 'Please check your connection.';
+                els.error.style.display = 'block';
+            }
+        }
+
+        // Start
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
     </script>
 </body>
 </html>

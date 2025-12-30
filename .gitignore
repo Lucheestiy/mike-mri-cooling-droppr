@@ -4,3 +4,11 @@ database/*
 !config/.keep
 !database/.keep
 
+data/*
+!data/.keep
+
+media-server/__pycache__/
+*.pyc
+
+cloudflare/creds/*
+!cloudflare/creds/.keep

@@ -4,9 +4,21 @@ Droppr is a lightweight file sharing UI for videos/pictures using File Browser. 
 
 ## Sharing folders (avoid ZIP downloads)
 
-File Browser’s “download” endpoint (`/api/public/dl/<hash>`) downloads folders as a `.zip`. Droppr redirects **bare** download links to the share UI (`/share/<hash>`) so recipients see pictures/videos in the browser.
+File Browser’s “download” endpoint (`/api/public/dl/<hash>`) downloads folders as a `.zip`. Droppr redirects **bare** folder-share links to the media gallery (`/gallery/<hash>`) so recipients see pictures/videos in the browser.
 
-If you ever need the `.zip` download, add any query string (example: `?download=1`) to bypass the redirect.
+To download everything as a `.zip`, use the gallery’s **Download All** button (calls `/api/share/<hash>/download`).
+
+Note: the gallery caches a share for performance. If you add new files after creating a share, reload the gallery and click **Refresh** to pull the latest folder contents.
+
+## Analytics (downloads + IPs)
+
+- Admin-only page: `/analytics` (requires File Browser login; uses your JWT token).
+- Tracks gallery views + downloads (ZIP downloads + explicit file downloads) with timestamps and IPs.
+- Stored in SQLite at `./database/droppr-analytics.sqlite3` (default retention: 180 days).
+- Config via env vars on the `media-server` container:
+  - `DROPPR_ANALYTICS_ENABLED=true|false`
+  - `DROPPR_ANALYTICS_RETENTION_DAYS=180` (set `0` to disable retention cleanup)
+  - `DROPPR_ANALYTICS_IP_MODE=full|anonymized|off`
 
 ## Fast Start (Better Video Streaming)
 
@@ -17,6 +29,10 @@ This stack includes a `droppr-faststart` service that automatically fixes new `.
 ## Upload Conflicts (HTTP 409)
 
 File Browser returns HTTP `409` when uploading a file that already exists (common when a phone retries the same upload). Droppr now proxies uploads with `override=true` so retrying the same filename overwrites the existing file instead of failing.
+
+## Auto Share Link (Single File Upload)
+
+When you upload **exactly one file**, Droppr automatically creates a File Browser share for that file and shows the public share link immediately (it also attempts to copy it to your clipboard). Uploading multiple files keeps the normal behavior (no auto-share).
 
 ## Start
 
@@ -50,15 +66,20 @@ Some clients rely on `HEAD` and conditional GETs for media endpoints like `/api/
 
 ## Public URL (Cloudflare Tunnel)
 
-The production tunnel config at `/home/mlweb/mri-cooling/cloudflare/config.yml` must include:
+Droppr runs its own Cloudflare tunnel (separate from the production stack).
 
-- `hostname: droppr.coolmri.com` -> `service: http://droppr:80`
-
-After updating the config, restart the production tunnel:
+Create the tunnel + config/credentials:
 
 ```bash
-cd /home/mlweb/mri-cooling
-docker compose restart cloudflared
+cd /home/mlweb/mri-cooling-droppr
+./setup-cloudflare-tunnel.sh
 ```
 
-If `droppr.coolmri.com` does not resolve, add a DNS record in Cloudflare (or a wildcard `*.coolmri.com` record) pointing at the production tunnel.
+Start the tunnel container:
+
+```bash
+cd /home/mlweb/mri-cooling-droppr
+docker compose --profile tunnel up -d
+```
+
+In Cloudflare DNS, add the CNAME record printed by the setup script (`droppr` → `<TUNNEL_ID>.cfargotunnel.com`).
