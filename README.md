@@ -26,6 +26,16 @@ Many iPhone `.mov` uploads store the `moov` atom at the end of the file, which m
 
 This stack includes a `droppr-faststart` service that automatically fixes new `.mov/.mp4/.m4v` uploads by moving `moov` to the front **without re-encoding**.
 
+## Video Quality (Fast + HD)
+
+The public gallery opens videos in `/player` and can use cached proxy MP4s (served from `/api/proxy-cache/...`) for faster reloads and seeking:
+
+- `Auto`: on desktop, switches to `Fast` while scrolling/seeking, then upgrades to `HD` once settled; on iOS, `Auto` starts in `HD` and avoids automatic source switching.
+- `Fast`: prefers the low-res proxy for quick scrubbing.
+- `HD`: prefers the HD proxy (falls back while it prepares).
+
+Proxy files are generated on-demand by `media-server` and persisted under `./database/proxy-cache/`.
+
 ## Upload Conflicts (HTTP 409)
 
 File Browser returns HTTP `409` when uploading a file that already exists (common when a phone retries the same upload). Droppr now proxies uploads with `override=true` so retrying the same filename overwrites the existing file instead of failing.

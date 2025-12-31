@@ -16,7 +16,7 @@ files_url="${base_url}/api/share/${share_hash}/files"
 
 echo "GET ${gallery_url}"
 html="$(curl -fsS "${gallery_url}")"
-if ! printf '%s' "${html}" | rg -q "Shared Media Gallery"; then
+if ! rg -q "Shared Media Gallery" <<<"${html}"; then
   echo "FAIL: gallery HTML missing expected title text" >&2
   exit 1
 fi
@@ -123,7 +123,7 @@ if [[ -n "$video_path_encoded" ]]; then
   player_url="${base_url}/player?share=${share_hash}&file=${video_path_encoded}"
   echo "GET ${player_url}"
   player_html="$(curl -fsS "${player_url}")"
-  if ! printf '%s' "${player_html}" | rg -q 'id="video"'; then
+  if ! rg -q 'id="video"' <<<"${player_html}"; then
     echo "FAIL: player HTML missing video element" >&2
     exit 1
   fi

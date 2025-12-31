@@ -1,4 +1,4 @@
-<!-- VERSION: 1.4.5 - Buffer bar moved to top, distinct styling -->
+<!-- VERSION: 1.4.11 - Auto shows active source; iOS Auto=HD -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -290,12 +290,36 @@
         let sourcesPollStartedAt = 0;
         let sourcesPollInFlight = false;
         let lastHdFailureAt = 0;
+        let hdFailureCount = 0;
+        let hdSuppressedUntil = 0;
+        let hdAutoDisabled = false;
+        let hdStableTimer = null;
+        let hdUpgradeTimer = null;
         let hdPrepareInFlight = false;
+        let fastPrepareInFlight = false;
+
+        let interactionTimer = null;
+        let lastInteractionAt = 0;
+        let isInteracting = false;
 
         const AUTO_STALL_FALLBACK_MS = 3500;
-        const HD_FAILURE_COOLDOWN_MS = 15000;
+        const AUTO_STALL_FALLBACK_INITIAL_MS = 8000;
+        const HD_FAILURE_BASE_COOLDOWN_MS = 15000;
+        const HD_FAILURE_MAX_COOLDOWN_MS = 5 * 60 * 1000;
+        const HD_FAILURE_DISABLE_AFTER = 3;
+        const HD_STABLE_RESET_MS = 5000;
+        const AUTO_HD_UPGRADE_DELAY_MS = 1200;
         const SOURCES_POLL_MS = 2000;
         const SOURCES_POLL_MAX_MS = 10 * 60 * 1000;
+        const INTERACTION_IDLE_MS = 800;
+
+        const UA = navigator.userAgent || '';
+        const IS_IOS =
+            /iPad|iPhone|iPod/i.test(UA) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        // iOS/WebKit can fail to resume playback after programmatic src swaps (start/stop loops).
+        // In Auto mode on iOS, start in HD and avoid automatic source switching.
+        const AUTO_SWITCH_ENABLED = !IS_IOS;
 
         function formatTime(seconds) {
             if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
@@ -320,6 +344,59 @@
             return `${v.toFixed(digits)} ${units[i]}`;
         }
 
+        function clearHdStableTimer() {
+            if (!hdStableTimer) return;
+            clearTimeout(hdStableTimer);
+            hdStableTimer = null;
+        }
+
+        function computeHdCooldownMs() {
+            const exp = Math.max(0, hdFailureCount - 1);
+            const ms = HD_FAILURE_BASE_COOLDOWN_MS * Math.pow(2, exp);
+            return Math.min(HD_FAILURE_MAX_COOLDOWN_MS, ms);
+        }
+
+        function noteHdFailure() {
+            lastHdFailureAt = Date.now();
+            hdFailureCount = Math.min(10, hdFailureCount + 1);
+            hdSuppressedUntil = lastHdFailureAt + computeHdCooldownMs();
+            hdAutoDisabled = hdFailureCount >= HD_FAILURE_DISABLE_AFTER;
+            clearHdStableTimer();
+            if (hdUpgradeTimer) {
+                clearTimeout(hdUpgradeTimer);
+                hdUpgradeTimer = null;
+            }
+        }
+
+        function noteHdStable() {
+            hdFailureCount = 0;
+            hdSuppressedUntil = 0;
+            hdAutoDisabled = false;
+        }
+
+        function startHdStableTimer() {
+            clearHdStableTimer();
+            hdStableTimer = setTimeout(() => {
+                if (activeSource !== 'hd') return;
+                if (video.paused) return;
+                if (video.seeking) return;
+                if (video.error) return;
+                noteHdStable();
+                updateStatusUI();
+            }, HD_STABLE_RESET_MS);
+        }
+
+        function scheduleHdUpgrade(delayMs) {
+            if (qualityMode !== 'auto') return;
+            if (!AUTO_SWITCH_ENABLED) return;
+            if (hdAutoDisabled) return;
+            if (hdUpgradeTimer) clearTimeout(hdUpgradeTimer);
+            hdUpgradeTimer = setTimeout(() => {
+                hdUpgradeTimer = null;
+                maybeUpgradeToHd();
+            }, Math.max(0, delayMs || 0));
+        }
+
         function sourceLabel(sourceType) {
             if (sourceType === 'hd') return 'HD';
             if (sourceType === 'fast') return 'Fast';
@@ -334,7 +411,7 @@
         function updateQualityUI() {
             const modeLabel = QUALITY_LABEL[qualityMode] || 'Auto';
             const srcLabel = activeSource ? sourceLabel(activeSource) : '';
-            qualityBtn.textContent = modeLabel;
+            qualityBtn.textContent = (qualityMode === 'auto' && srcLabel) ? `${modeLabel} (${srcLabel})` : modeLabel;
 
             const sizeBytes =
                 (activeSource && sources[activeSource] && sources[activeSource].size) ||
@@ -418,6 +495,22 @@
             if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready && hdPrepareInFlight) {
                 text += ' • Preparing HD…';
             }
+            if ((qualityMode === 'auto' || qualityMode === 'fast') && !sources.fast.ready && fastPrepareInFlight) {
+                text += ' • Preparing Fast…';
+            }
+
+            if (qualityMode === 'auto' && !AUTO_SWITCH_ENABLED) {
+                text += ' • iOS: Auto=HD';
+            }
+
+            if (qualityMode === 'auto' && sources.hd.ready && activeSource !== 'hd') {
+                if (hdAutoDisabled) {
+                    text += ' • HD off (tap HD)';
+                } else if (hdSuppressedUntil && Date.now() < hdSuppressedUntil) {
+                    const secs = Math.max(1, Math.ceil((hdSuppressedUntil - Date.now()) / 1000));
+                    text += ` • HD retry in ${secs}s`;
+                }
+            }
 
             bufferText.textContent = text;
         }
@@ -445,11 +538,77 @@
             return appendCacheBust(base, cacheBust);
         }
 
-        function pickPlayableSource(desired) {
-            if (desired === 'hd' && sources.hd.ready) return 'hd';
-            if (desired === 'fast' && sources.fast.ready) return 'fast';
-            if (sources.fast.ready) return 'fast';
+        function pickPlayableSource(desired, opts) {
+            const options = opts || {};
+            const avoid = options.avoid ? String(options.avoid) : '';
+
+            if (desired === 'hd') {
+                if (avoid !== 'hd' && sources.hd.ready) return 'hd';
+                if (avoid !== 'fast' && sources.fast.ready) return 'fast';
+                return 'original';
+            }
+
+            if (desired === 'fast') {
+                if (avoid !== 'fast' && sources.fast.ready) return 'fast';
+                if (avoid !== 'hd' && sources.hd.ready) return 'hd';
+                return 'original';
+            }
+
+            if (avoid !== 'hd' && sources.hd.ready) return 'hd';
+            if (avoid !== 'fast' && sources.fast.ready) return 'fast';
             return 'original';
+        }
+
+        function desiredForCurrentMode() {
+            if (qualityMode === 'fast') return 'fast';
+            if (qualityMode === 'hd') return 'hd';
+            if (!AUTO_SWITCH_ENABLED) return 'hd';
+            if (hdAutoDisabled) return 'fast';
+            if (video.paused) return 'fast';
+            if (isInteracting || video.seeking) return 'fast';
+            return 'hd';
+        }
+
+        function noteInteraction(opts) {
+            const options = opts || {};
+            const allowFastSwitch = options.allowFastSwitch !== false;
+
+            lastInteractionAt = Date.now();
+            if (!isInteracting) {
+                isInteracting = true;
+                if (hdUpgradeTimer) {
+                    clearTimeout(hdUpgradeTimer);
+                    hdUpgradeTimer = null;
+                }
+                if (qualityMode === 'auto') {
+                    if (!sources.fast.ready && !fastPrepareInFlight) ensurePrepared(['fast']);
+                    if (AUTO_SWITCH_ENABLED && allowFastSwitch && sources.fast.ready && activeSource !== 'fast' && !switchInProgress) {
+                        setSource('fast', { time: video.currentTime, shouldPlay: !video.paused });
+                    }
+                }
+                updateStatusUI();
+            }
+
+            if (interactionTimer) clearTimeout(interactionTimer);
+            interactionTimer = setTimeout(() => {
+                if (Date.now() - lastInteractionAt < INTERACTION_IDLE_MS) return;
+                interactionTimer = null;
+                if (!isInteracting) return;
+                isInteracting = false;
+                updateStatusUI();
+
+                if (qualityMode === 'auto' && !video.paused) {
+                    if (
+                        AUTO_SWITCH_ENABLED &&
+                        !hdAutoDisabled &&
+                        !sources.hd.ready &&
+                        !hdPrepareInFlight
+                    ) {
+                        ensurePrepared(['hd']);
+                    }
+                    scheduleHdUpgrade(AUTO_HD_UPGRADE_DELAY_MS);
+                }
+            }, INTERACTION_IDLE_MS + 25);
         }
 
         function clearTimers() {
@@ -510,9 +669,9 @@
                 () => {
                     done();
                     if (qualityMode === 'auto' && sourceType === 'hd') {
-                        lastHdFailureAt = Date.now();
+                        noteHdFailure();
                         const t = Number.isFinite(targetTime) ? targetTime : currentTimeBefore;
-                        setSource(pickPlayableSource('fast'), { time: t, shouldPlay });
+                        setSource(pickPlayableSource('fast', { avoid: 'hd' }), { time: t, shouldPlay });
                     }
                 },
                 { once: true }
@@ -586,6 +745,7 @@
                 if (sourcesPollStartedAt && (Date.now() - sourcesPollStartedAt) > SOURCES_POLL_MAX_MS) {
                     clearInterval(sourcesPollTimer);
                     sourcesPollTimer = null;
+                    fastPrepareInFlight = false;
                     hdPrepareInFlight = false;
                     updateStatusUI();
                     return;
@@ -593,32 +753,54 @@
                 if (sourcesPollInFlight) return;
                 sourcesPollInFlight = true;
                 try {
+                    const beforeFast = sources.fast.ready;
                     const beforeHd = sources.hd.ready;
                     const data = await fetchSources();
                     if (data) applySourcesData(data);
+                    const afterFast = sources.fast.ready;
                     const afterHd = sources.hd.ready;
-                    if (!beforeHd && afterHd) {
-                        hdPrepareInFlight = false;
-                        updateStatusUI();
-                        if ((qualityMode === 'auto' || qualityMode === 'hd') && !switchInProgress) {
-                            const shouldPlay = !video.paused;
-                            if (qualityMode === 'hd' || shouldPlay) {
-                                if (Date.now() - lastHdFailureAt > HD_FAILURE_COOLDOWN_MS) {
-                                    const attemptSwitch = () => {
-                                        if (switchInProgress) return;
-                                        if ((qualityMode !== 'auto' && qualityMode !== 'hd') || activeSource === 'hd') return;
-                                        if (video.seeking) return;
-                                        setSource('hd', { time: video.currentTime, shouldPlay: !video.paused });
-                                    };
 
-                                    if (video.seeking) setTimeout(attemptSwitch, 500);
-                                    else attemptSwitch();
+                    if (!beforeFast && afterFast) {
+                        fastPrepareInFlight = false;
+                        updateStatusUI();
+
+                        const shouldPlay = !video.paused;
+                        if (!switchInProgress) {
+                            if (qualityMode === 'fast' && activeSource !== 'fast') {
+                                setSource('fast', { time: video.currentTime, shouldPlay });
+                            } else if (qualityMode === 'auto' && AUTO_SWITCH_ENABLED) {
+                                if ((isInteracting || video.seeking || video.paused) && activeSource !== 'fast') {
+                                    setSource('fast', { time: video.currentTime, shouldPlay });
                                 }
                             }
                         }
                     }
 
-                    if (sources.hd.ready || qualityMode === 'fast') {
+                    if (!beforeHd && afterHd) {
+                        hdPrepareInFlight = false;
+                        updateStatusUI();
+                        if (switchInProgress) {
+                            // wait for current switch to finish
+                        } else if (qualityMode === 'hd') {
+                            const attemptSwitch = () => {
+                                if (switchInProgress) return;
+                                if (qualityMode !== 'hd' || activeSource === 'hd') return;
+                                if (isInteracting || video.seeking) {
+                                    setTimeout(attemptSwitch, 500);
+                                    return;
+                                }
+                                setSource('hd', { time: video.currentTime, shouldPlay: !video.paused });
+                            };
+                            attemptSwitch();
+                        } else if (qualityMode === 'auto' && AUTO_SWITCH_ENABLED && !video.paused) {
+                            scheduleHdUpgrade(AUTO_HD_UPGRADE_DELAY_MS);
+                        }
+                    }
+
+                    if (sources.fast.ready) fastPrepareInFlight = false;
+                    if (sources.hd.ready) hdPrepareInFlight = false;
+
+                    if (!fastPrepareInFlight && !hdPrepareInFlight) {
                         clearInterval(sourcesPollTimer);
                         sourcesPollTimer = null;
                     }
@@ -630,6 +812,7 @@
 
         async function ensurePrepared(targets) {
             if (!targets || !targets.length) return;
+            if (targets.includes('fast')) fastPrepareInFlight = true;
             if (targets.includes('hd')) hdPrepareInFlight = true;
             updateStatusUI();
             const data = await fetchSources({ prepareTargets: targets });
@@ -639,27 +822,34 @@
 
         function scheduleStallFallback() {
             if (qualityMode !== 'auto') return;
+            if (!AUTO_SWITCH_ENABLED) return;
             if (activeSource !== 'hd') return;
             if (switchInProgress) return;
             if (video.paused) return;
 
             if (stallTimer) clearTimeout(stallTimer);
+            const elapsed = Date.now() - (sourceLoadStartedAt || 0);
+            const delay = elapsed < 6000 ? AUTO_STALL_FALLBACK_INITIAL_MS : AUTO_STALL_FALLBACK_MS;
             stallTimer = setTimeout(() => {
                 if (qualityMode !== 'auto') return;
                 if (activeSource !== 'hd') return;
                 if (switchInProgress) return;
                 if (video.paused) return;
 
-                lastHdFailureAt = Date.now();
-                setSource(pickPlayableSource('fast'), { time: video.currentTime, shouldPlay: true });
-            }, AUTO_STALL_FALLBACK_MS);
+                noteHdFailure();
+                setSource(pickPlayableSource('fast', { avoid: 'hd' }), { time: video.currentTime, shouldPlay: true });
+            }, delay);
         }
 
         function maybeUpgradeToHd() {
             if (qualityMode !== 'auto') return;
+            if (!AUTO_SWITCH_ENABLED) return;
+            if (hdAutoDisabled) return;
+            if (isInteracting) return;
+            if (video.seeking) return;
             if (activeSource === 'hd') return;
             if (!sources.hd.ready) return;
-            if (Date.now() - lastHdFailureAt <= HD_FAILURE_COOLDOWN_MS) return;
+            if (hdSuppressedUntil && Date.now() < hdSuppressedUntil) return;
             if (switchInProgress) return;
 
             const shouldPlay = !video.paused;
@@ -674,13 +864,15 @@
             fetchSources().then((data) => {
                 if (data) applySourcesData(data);
 
-                if (qualityMode === 'hd' && !sources.hd.ready) {
+                if (qualityMode === 'auto' && !sources.fast.ready) {
+                    ensurePrepared(['fast']);
+                } else if (qualityMode === 'hd' && !sources.hd.ready) {
                     ensurePrepared(['hd']);
                 } else if (qualityMode === 'fast' && !sources.fast.ready) {
                     ensurePrepared(['fast']);
                 }
 
-                const desired = qualityMode === 'fast' ? 'fast' : 'hd';
+                const desired = desiredForCurrentMode();
                 setSource(pickPlayableSource(desired), { time: 0, shouldPlay: false });
             });
         }
@@ -692,9 +884,10 @@
 
             const t = video.currentTime;
             const shouldPlay = !video.paused;
-            const desired = qualityMode === 'fast' ? 'fast' : 'hd';
+            const desired = desiredForCurrentMode();
 
             if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready) ensurePrepared(['hd']);
+            if (qualityMode === 'auto' && !sources.fast.ready) ensurePrepared(['fast']);
             if (qualityMode === 'fast' && !sources.fast.ready) ensurePrepared(['fast']);
 
             setSource(pickPlayableSource(desired), { time: t, shouldPlay });
@@ -705,7 +898,7 @@
         reloadBtn.onclick = () => {
             const t = video.currentTime;
             const shouldPlay = !video.paused;
-            setSource(activeSource || pickPlayableSource(qualityMode === 'fast' ? 'fast' : 'hd'), {
+            setSource(activeSource || pickPlayableSource(desiredForCurrentMode()), {
                 time: t,
                 shouldPlay,
                 cacheBust: true,
@@ -713,22 +906,30 @@
         };
 
         video.addEventListener('play', () => {
-            if ((qualityMode === 'auto' || qualityMode === 'hd') && !sources.hd.ready) ensurePrepared(['hd']);
+            if (qualityMode === 'auto' && !sources.fast.ready && !fastPrepareInFlight) ensurePrepared(['fast']);
+            if ((qualityMode === 'hd' || (qualityMode === 'auto' && !hdAutoDisabled)) && !sources.hd.ready && !hdPrepareInFlight) {
+                ensurePrepared(['hd']);
+            }
+            if (qualityMode === 'fast' && !sources.fast.ready && !fastPrepareInFlight) ensurePrepared(['fast']);
         });
 
         video.addEventListener('playing', () => {
             if (stallTimer) clearTimeout(stallTimer);
             stallTimer = null;
-            if (qualityMode === 'auto') maybeUpgradeToHd();
+            if (activeSource === 'hd') startHdStableTimer();
+            if (qualityMode === 'auto') scheduleHdUpgrade(AUTO_HD_UPGRADE_DELAY_MS);
             updateStatusUI();
         });
-        video.addEventListener('waiting', () => { scheduleStallFallback(); updateStatusUI(); });
-        video.addEventListener('stalled', () => { scheduleStallFallback(); updateStatusUI(); });
+        video.addEventListener('seeking', () => { clearHdStableTimer(); if (!switchInProgress) noteInteraction(); updateStatusUI(); });
+        video.addEventListener('seeked', () => { noteInteraction({ allowFastSwitch: false }); updateStatusUI(); });
+        video.addEventListener('waiting', () => { clearHdStableTimer(); scheduleStallFallback(); updateStatusUI(); });
+        video.addEventListener('stalled', () => { clearHdStableTimer(); scheduleStallFallback(); updateStatusUI(); });
         video.addEventListener('progress', updateStatusUI);
         video.addEventListener('timeupdate', updateStatusUI);
-        video.addEventListener('pause', updateStatusUI);
+        video.addEventListener('pause', () => { clearHdStableTimer(); updateStatusUI(); });
 
         video.addEventListener('error', () => {
+            clearHdStableTimer();
             if (qualityMode === 'auto' && activeSource === 'hd') return;
             showError('Could not load video', 'Try Reload. If it keeps failing, go back to the gallery.');
         });
