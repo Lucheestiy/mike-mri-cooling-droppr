@@ -47,7 +47,7 @@ MAX_SHARE_HASH_LENGTH = 64  # Prevent DOS via extremely long hashes
 DEFAULT_CACHE_TTL_SECONDS = int(os.environ.get("DROPPR_SHARE_CACHE_TTL_SECONDS", "3600"))
 MAX_CACHE_SIZE = 1000  # Max number of shares to cache
 _share_cache_lock = threading.Lock()
-_share_files_cache: dict[str, tuple[float, list[dict]]] = {}
+_share_files_cache: dict[str, tuple[float, str, list[dict]]] = {}
 
 IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"}
 VIDEO_EXTS = {"mp4", "mov", "m4v", "webm", "mkv", "avi"}
@@ -84,6 +84,29 @@ def _safe_rel_path(value: str) -> str | None:
     return "/".join(parts)
 
 
+def _encode_share_path(value: str) -> str | None:
+    if value is None:
+        return None
+
+    value = str(value).strip()
+    if not value:
+        return None
+    if "\\" in value:
+        return None
+
+    if not value.startswith("/"):
+        value = "/" + value
+
+    value = re.sub(r"/+", "/", value)
+    parts = [p for p in value.split("/") if p]
+    if not parts:
+        return "/"
+    if any(p == ".." for p in parts):
+        return None
+
+    return "/" + "/".join(quote(p, safe="") for p in parts)
+
+
 def _normalize_ip(value: str | None) -> str | None:
     if not value:
         return None
@@ -110,8 +133,12 @@ ANALYTICS_LOG_ZIP_DOWNLOADS = parse_bool(os.environ.get("DROPPR_ANALYTICS_LOG_ZI
 ANALYTICS_IP_MODE = (os.environ.get("DROPPR_ANALYTICS_IP_MODE", "full") or "full").strip().lower()
 ANALYTICS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ANALYTICS_DB_TIMEOUT_SECONDS", "30"))
 
+ALIASES_DB_PATH = os.environ.get("DROPPR_ALIASES_DB_PATH", "/database/droppr-aliases.sqlite3")
+ALIASES_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ALIASES_DB_TIMEOUT_SECONDS", "30"))
+
 _last_retention_sweep_at: float = 0.0
 _analytics_db_ready: bool = False
+_aliases_db_ready: bool = False
 
 
 def _get_client_ip() -> str | None:
@@ -254,6 +281,177 @@ def _ensure_analytics_db() -> None:
             lock_file.close()
 
 
+@contextmanager
+def _aliases_conn():
+    _ensure_aliases_db()
+
+    conn = sqlite3.connect(
+        ALIASES_DB_PATH,
+        timeout=ALIASES_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA temp_store=MEMORY;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _init_aliases_db() -> None:
+    db_dir = os.path.dirname(ALIASES_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(
+        ALIASES_DB_PATH,
+        timeout=ALIASES_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS share_aliases (
+                from_hash TEXT PRIMARY KEY,
+                to_hash TEXT NOT NULL,
+                path TEXT,
+                target_expire INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_share_aliases_to_hash ON share_aliases(to_hash)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_share_aliases_updated_at ON share_aliases(updated_at)")
+    finally:
+        conn.close()
+
+
+def _ensure_aliases_db() -> None:
+    global _aliases_db_ready
+
+    if _aliases_db_ready:
+        return
+
+    db_dir = os.path.dirname(ALIASES_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    lock_path = f"{ALIASES_DB_PATH}.init.lock"
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        for attempt in range(10):
+            try:
+                _init_aliases_db()
+                _aliases_db_ready = True
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 9:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                app.logger.warning("Aliases init failed: %s", e)
+                return
+            except Exception as e:
+                app.logger.warning("Aliases init failed: %s", e)
+                return
+    finally:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        finally:
+            lock_file.close()
+
+
+MAX_ALIAS_DEPTH = 10
+
+
+def _resolve_share_hash(share_hash: str) -> str:
+    if not is_valid_share_hash(share_hash):
+        return share_hash
+
+    current = share_hash
+    visited = {current}
+    try:
+        with _aliases_conn() as conn:
+            for _ in range(MAX_ALIAS_DEPTH):
+                row = conn.execute(
+                    "SELECT to_hash FROM share_aliases WHERE from_hash = ? LIMIT 1",
+                    (current,),
+                ).fetchone()
+                if row is None:
+                    break
+                nxt = str(row["to_hash"] or "").strip()
+                if not is_valid_share_hash(nxt) or nxt in visited:
+                    break
+                visited.add(nxt)
+                current = nxt
+    except Exception:
+        return share_hash
+
+    return current
+
+
+def _upsert_share_alias(*, from_hash: str, to_hash: str, path: str | None, target_expire: int | None) -> None:
+    if not is_valid_share_hash(from_hash) or not is_valid_share_hash(to_hash):
+        raise ValueError("Invalid share hash")
+
+    now = int(time.time())
+    with _aliases_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO share_aliases (from_hash, to_hash, path, target_expire, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(from_hash) DO UPDATE SET
+                to_hash = excluded.to_hash,
+                path = excluded.path,
+                target_expire = excluded.target_expire,
+                updated_at = excluded.updated_at
+            """,
+            (from_hash, to_hash, path, target_expire, now, now),
+        )
+
+
+def _list_share_aliases(*, limit: int = 500) -> list[dict]:
+    limit = max(1, min(int(limit or 500), 5000))
+    with _aliases_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT from_hash, to_hash, path, target_expire, created_at, updated_at
+            FROM share_aliases
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    result = []
+    for row in rows:
+        result.append(
+            {
+                "from_hash": str(row["from_hash"]),
+                "to_hash": str(row["to_hash"]),
+                "path": row["path"],
+                "target_expire": int(row["target_expire"] or 0) if row["target_expire"] else None,
+                "created_at": int(row["created_at"] or 0) if row["created_at"] else None,
+                "updated_at": int(row["updated_at"] or 0) if row["updated_at"] else None,
+            }
+        )
+
+    return result
+
+
 def _maybe_apply_retention(conn: sqlite3.Connection) -> None:
     global _last_retention_sweep_at
 
@@ -330,6 +528,32 @@ def _get_auth_token() -> str | None:
     return None
 
 
+def _validate_filebrowser_admin(token: str) -> int | None:
+    resp = requests.get(f"{FILEBROWSER_BASE_URL}/api/users", headers={"X-Auth": token}, timeout=10)
+    if resp.status_code in {401, 403}:
+        return resp.status_code
+    resp.raise_for_status()
+    return None
+
+
+def _create_filebrowser_share(*, token: str, path_encoded: str, hours: int) -> dict:
+    body = {"password": "", "expires": "", "unit": "hours"}
+    if hours > 0:
+        body["expires"] = str(hours)
+
+    resp = requests.post(
+        f"{FILEBROWSER_BASE_URL}/api/share{path_encoded}",
+        headers={"X-Auth": token, "Content-Type": "application/json"},
+        json=body,
+        timeout=10,
+    )
+    if resp.status_code in {401, 403}:
+        raise PermissionError("Unauthorized")
+    resp.raise_for_status()
+    data = resp.json()
+    return data if isinstance(data, dict) else {}
+
+
 def _fetch_filebrowser_shares(token: str) -> list[dict]:
     # TEMPORARY FIX: Disable fetching shares to prevent FileBrowser panic (slice bounds out of range)
     # The endpoint GET /api/shares seems to crash the current FileBrowser instance.
@@ -400,7 +624,7 @@ def _infer_gallery_type(item: dict, extension: str) -> str:
     return "file"
 
 
-def _build_folder_share_file_list(share_hash: str, root: dict) -> list[dict]:
+def _build_folder_share_file_list(*, request_hash: str, source_hash: str, root: dict) -> list[dict]:
     files: list[dict] = []
     dirs_to_scan: list[str] = []
     visited_dirs: set[str] = set()
@@ -425,7 +649,7 @@ def _build_folder_share_file_list(share_hash: str, root: dict) -> list[dict]:
             continue
         visited_dirs.add(dir_path)
 
-        data = _fetch_public_share_json(share_hash, subpath=dir_path)
+        data = _fetch_public_share_json(source_hash, subpath=dir_path)
         if not data:
             continue
         items = data.get("items")
@@ -465,22 +689,22 @@ def _build_folder_share_file_list(share_hash: str, root: dict) -> list[dict]:
                 "type": _infer_gallery_type(item, ext),
                 "extension": ext,
                 "size": int(item.get("size") or 0),
-                "inline_url": f"/api/public/dl/{share_hash}/{quote(rel_path, safe='/')}?inline=true",
-                "download_url": f"/api/share/{share_hash}/file/{quote(rel_path, safe='/')}?download=1",
+                "inline_url": f"/api/public/dl/{source_hash}/{quote(rel_path, safe='/')}?inline=true",
+                "download_url": f"/api/share/{request_hash}/file/{quote(rel_path, safe='/')}?download=1",
             }
         )
 
     return result
 
 
-def _build_file_share_file_list(share_hash: str, meta: dict) -> list[dict]:
+def _build_file_share_file_list(*, request_hash: str, source_hash: str, meta: dict) -> list[dict]:
     raw_path = meta.get("path")
     name = meta.get("name")
     if not isinstance(name, str) or not name:
         if isinstance(raw_path, str) and raw_path:
             name = os.path.basename(raw_path)
         else:
-            name = share_hash
+            name = source_hash
 
     ext = meta.get("extension") if isinstance(meta.get("extension"), str) else ""
     ext = ext[1:] if ext.startswith(".") else ext
@@ -495,35 +719,37 @@ def _build_file_share_file_list(share_hash: str, meta: dict) -> list[dict]:
             "size": int(meta.get("size") or 0),
             # NOTE: /api/public/dl/<hash> is redirected to /gallery/<hash> by nginx, so we expose
             # a separate nginx route that proxies to FileBrowser without redirect.
-            "inline_url": f"/api/public/file/{share_hash}?inline=true",
-            "download_url": f"/api/share/{share_hash}/download",
+            "inline_url": f"/api/public/file/{source_hash}?inline=true",
+            "download_url": f"/api/share/{request_hash}/download",
         }
     ]
 
 
-def _get_share_files(share_hash: str, *, force_refresh: bool, max_age_seconds: int) -> list[dict] | None:
+def _get_share_files(
+    request_hash: str, *, source_hash: str, force_refresh: bool, max_age_seconds: int
+) -> list[dict] | None:
     now = time.time()
     if not force_refresh:
         with _share_cache_lock:
-            cached = _share_files_cache.get(share_hash)
-            if cached and (now - cached[0]) < max_age_seconds:
-                return cached[1]
+            cached = _share_files_cache.get(request_hash)
+            if cached and (now - cached[0]) < max_age_seconds and cached[1] == source_hash:
+                return cached[2]
 
-    data = _fetch_public_share_json(share_hash)
+    data = _fetch_public_share_json(source_hash)
     if not data:
         return None
 
     if isinstance(data.get("items"), list):
-        files = _build_folder_share_file_list(share_hash, data)
+        files = _build_folder_share_file_list(request_hash=request_hash, source_hash=source_hash, root=data)
     else:
-        files = _build_file_share_file_list(share_hash, data)
+        files = _build_file_share_file_list(request_hash=request_hash, source_hash=source_hash, meta=data)
 
     with _share_cache_lock:
         if len(_share_files_cache) >= MAX_CACHE_SIZE:
             # Simple eviction strategy: clear the whole cache if it gets too big.
             # A more sophisticated LRU is possible but likely overkill for this scale.
             _share_files_cache.clear()
-        _share_files_cache[share_hash] = (now, files)
+        _share_files_cache[request_hash] = (now, source_hash, files)
 
     return files
 
@@ -532,6 +758,8 @@ def _get_share_files(share_hash: str, *, force_refresh: bool, max_age_seconds: i
 def list_share_files(share_hash: str):
     if not is_valid_share_hash(share_hash):
         return jsonify({"error": "Invalid share hash"}), 400
+
+    source_hash = _resolve_share_hash(share_hash)
 
     force_refresh = parse_bool(request.args.get("refresh") or request.args.get("force"))
     max_age_param = request.args.get("max_age") or request.args.get("maxAge")
@@ -542,7 +770,12 @@ def list_share_files(share_hash: str):
         except (TypeError, ValueError):
             max_age_seconds = DEFAULT_CACHE_TTL_SECONDS
 
-    files = _get_share_files(share_hash, force_refresh=force_refresh, max_age_seconds=max_age_seconds)
+    files = _get_share_files(
+        share_hash,
+        source_hash=source_hash,
+        force_refresh=force_refresh,
+        max_age_seconds=max_age_seconds,
+    )
     if files is None:
         return jsonify({"error": "Share not found"}), 404
 
@@ -557,6 +790,8 @@ def serve_file(share_hash: str, filename: str):
     if not is_valid_share_hash(share_hash):
         return "Invalid share hash", 400
 
+    source_hash = _resolve_share_hash(share_hash)
+
     filename = filename or ""
     safe = _safe_rel_path(filename)
     if not safe:
@@ -568,8 +803,8 @@ def serve_file(share_hash: str, filename: str):
 
     encoded = quote(safe, safe="/")
     if is_download:
-        return redirect(f"/api/public/dl/{share_hash}/{encoded}?download=1", code=302)
-    return redirect(f"/api/public/dl/{share_hash}/{encoded}?inline=true", code=302)
+        return redirect(f"/api/public/dl/{source_hash}/{encoded}?download=1", code=302)
+    return redirect(f"/api/public/dl/{source_hash}/{encoded}?inline=true", code=302)
 
 
 CACHE_DIR = os.environ.get("DROPPR_CACHE_DIR", "/tmp/thumbnails")
@@ -935,6 +1170,8 @@ def serve_preview(share_hash: str, filename: str):
     if not is_valid_share_hash(share_hash):
         return "Invalid share hash", 400
 
+    source_hash = _resolve_share_hash(share_hash)
+
     filename = filename or ""
     safe = _safe_rel_path(filename)
     if not safe:
@@ -946,7 +1183,7 @@ def serve_preview(share_hash: str, filename: str):
     if not is_video and not is_image:
         return "Unsupported preview type", 415
 
-    cache_path = _get_cache_path(share_hash, safe)
+    cache_path = _get_cache_path(source_hash, safe)
     lock_path = cache_path + ".lock"
     
     # Check cache first (fast path)
@@ -971,7 +1208,7 @@ def serve_preview(share_hash: str, filename: str):
                         return Response(f.read(), mimetype="image/jpeg")
 
                 # Generate thumbnail
-                src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(safe, safe='/')}?inline=true"
+                src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{source_hash}/{quote(safe, safe='/')}?inline=true"
 
                 with _thumb_sema:
                     cmd = _ffmpeg_thumbnail_cmd(
@@ -1014,6 +1251,8 @@ def serve_proxy(share_hash: str, filename: str):
     if not is_valid_share_hash(share_hash):
         return "Invalid share hash", 400
 
+    source_hash = _resolve_share_hash(share_hash)
+
     filename = filename or ""
     safe = _safe_rel_path(filename)
     if not safe:
@@ -1024,17 +1263,22 @@ def serve_proxy(share_hash: str, filename: str):
         return "Unsupported proxy type", 415
 
     # Resolve file size to get a stable cache key (and invalidate on overwrite).
-    files = _get_share_files(share_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS) or []
+    files = (
+        _get_share_files(share_hash, source_hash=source_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS)
+        or []
+    )
     match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
     if not match:
-        files = _get_share_files(share_hash, force_refresh=True, max_age_seconds=0) or []
+        files = _get_share_files(share_hash, source_hash=source_hash, force_refresh=True, max_age_seconds=0) or []
         match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
 
     if not match:
         return "File not found", 404
 
     try:
-        _, _, public_url, _ = _ensure_fast_proxy_mp4(share_hash=share_hash, file_path=safe, size=int(match.get("size") or 0))
+        _, _, public_url, _ = _ensure_fast_proxy_mp4(
+            share_hash=source_hash, file_path=safe, size=int(match.get("size") or 0)
+        )
         return redirect(public_url, code=302)
     except subprocess.TimeoutExpired:
         app.logger.error("ffmpeg proxy timed out for %s", safe)
@@ -1051,6 +1295,8 @@ def video_sources(share_hash: str, filename: str):
     if not is_valid_share_hash(share_hash):
         return jsonify({"error": "Invalid share hash"}), 400
 
+    source_hash = _resolve_share_hash(share_hash)
+
     filename = filename or ""
     safe = _safe_rel_path(filename)
     if not safe:
@@ -1060,10 +1306,13 @@ def video_sources(share_hash: str, filename: str):
     if ext not in VIDEO_EXTS:
         return jsonify({"error": "Unsupported video type"}), 415
 
-    files = _get_share_files(share_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS) or []
+    files = (
+        _get_share_files(share_hash, source_hash=source_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS)
+        or []
+    )
     match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
     if not match:
-        files = _get_share_files(share_hash, force_refresh=True, max_age_seconds=0) or []
+        files = _get_share_files(share_hash, source_hash=source_hash, force_refresh=True, max_age_seconds=0) or []
         match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
 
     if not match:
@@ -1072,14 +1321,14 @@ def video_sources(share_hash: str, filename: str):
     original_url = match.get("inline_url")
     original_size = int(match.get("size") or 0)
 
-    proxy_key = _proxy_cache_key(share_hash=share_hash, file_path=safe, size=original_size)
+    proxy_key = _proxy_cache_key(share_hash=source_hash, file_path=safe, size=original_size)
     proxy_path = os.path.join(PROXY_CACHE_DIR, f"{proxy_key}.mp4")
     proxy_url = f"/api/proxy-cache/{proxy_key}.mp4"
 
     proxy_ready = os.path.exists(proxy_path)
     proxy_size = os.path.getsize(proxy_path) if proxy_ready else None
 
-    hd_key = _hd_cache_key(share_hash=share_hash, file_path=safe, size=original_size)
+    hd_key = _hd_cache_key(share_hash=source_hash, file_path=safe, size=original_size)
     hd_path = os.path.join(PROXY_CACHE_DIR, f"{hd_key}.mp4")
     hd_url = f"/api/proxy-cache/{hd_key}.mp4"
     hd_ready = os.path.exists(hd_path)
@@ -1110,7 +1359,7 @@ def video_sources(share_hash: str, filename: str):
         prepare_started["fast"] = _spawn_background(
             f"fast:{proxy_key}",
             _ensure_fast_proxy_mp4,
-            share_hash=share_hash,
+            share_hash=source_hash,
             file_path=safe,
             size=original_size,
         )
@@ -1119,7 +1368,7 @@ def video_sources(share_hash: str, filename: str):
         prepare_started["hd"] = _spawn_background(
             f"hd:{hd_key}",
             _ensure_hd_mp4,
-            share_hash=share_hash,
+            share_hash=source_hash,
             file_path=safe,
             size=original_size,
         )
@@ -1157,21 +1406,23 @@ def download_all(share_hash: str):
     if not is_valid_share_hash(share_hash):
         return "Invalid share hash", 400
 
+    source_hash = _resolve_share_hash(share_hash)
+
     # Check if this is a single-file share (video/image) that needs range request support
     # Mobile browsers require range requests for video playback
-    data = _fetch_public_share_json(share_hash)
+    data = _fetch_public_share_json(source_hash)
     if data and not isinstance(data.get("items"), list):
         # Single-file share - redirect to FileBrowser endpoint which supports range requests
         # This is critical for mobile video playback
         _log_event("file_download", share_hash)
         inline = request.args.get("inline") or request.args.get("play")
         if inline:
-            return redirect(f"/api/public/file/{share_hash}?inline=true", code=302)
-        return redirect(f"/api/public/file/{share_hash}", code=302)
+            return redirect(f"/api/public/file/{source_hash}?inline=true", code=302)
+        return redirect(f"/api/public/file/{source_hash}", code=302)
 
     # Folder share - stream ZIP through proxy (no range support needed for ZIP downloads)
     try:
-        req_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}?download=1"
+        req_url = f"{FILEBROWSER_PUBLIC_DL_API}/{source_hash}?download=1"
         req = requests.get(req_url, stream=True, timeout=120)
         req.raise_for_status()
         _log_event("zip_download", share_hash)
@@ -1192,6 +1443,107 @@ def download_all(share_hash: str):
     except Exception as e:
         app.logger.error("Failed to download share for %s: %s", share_hash, e)
         return "Failed to download share", 500
+
+
+@app.route("/api/droppr/shares/<share_hash>/expire", methods=["POST"])
+def droppr_update_share_expire(share_hash: str):
+    if not is_valid_share_hash(share_hash):
+        return jsonify({"error": "Invalid share hash"}), 400
+
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    payload = request.get_json(silent=True) or {}
+    hours_raw = payload.get("hours")
+    if hours_raw is None:
+        hours_raw = payload.get("expires_hours") or payload.get("expiresHours")
+    if hours_raw is None:
+        return jsonify({"error": "Missing hours"}), 400
+
+    try:
+        hours = int(str(hours_raw).strip() or "0")
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid hours"}), 400
+
+    max_hours = 24 * 365 * 10
+    if hours < 0 or hours > max_hours:
+        return jsonify({"error": f"Hours must be between 0 and {max_hours}"}), 400
+
+    try:
+        path = payload.get("path")
+        if not isinstance(path, str) or not path.strip():
+            source_hash = _resolve_share_hash(share_hash)
+            meta = _fetch_public_share_json(source_hash)
+            path = meta.get("path") if isinstance(meta, dict) else None
+
+        if not isinstance(path, str) or not path.strip():
+            return jsonify({"error": "Missing share path"}), 400
+
+        path_encoded = _encode_share_path(path)
+        if not path_encoded:
+            return jsonify({"error": "Invalid share path"}), 400
+
+        new_share = _create_filebrowser_share(token=token, path_encoded=path_encoded, hours=hours)
+        new_hash = new_share.get("hash")
+        new_expire = new_share.get("expire")
+        if not is_valid_share_hash(new_hash):
+            raise RuntimeError("Share API returned invalid hash")
+
+        target_expire = int(new_expire or 0) if new_expire is not None else None
+        _upsert_share_alias(from_hash=share_hash, to_hash=new_hash, path=path, target_expire=target_expire)
+
+        with _share_cache_lock:
+            _share_files_cache.pop(share_hash, None)
+
+        result = {
+            "hash": share_hash,
+            "target_hash": new_hash,
+            "path": path,
+            "target_expire": target_expire,
+            "hours": hours,
+        }
+    except Exception as e:
+        app.logger.error("Failed to update share expiration for %s: %s", share_hash, e)
+        return jsonify({"error": "Failed to update share expiration"}), 500
+
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/droppr/shares/aliases")
+def droppr_list_share_aliases():
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    limit = _parse_int(request.args.get("limit")) or 500
+    try:
+        aliases = _list_share_aliases(limit=limit)
+    except Exception as e:
+        app.logger.error("Failed to list share aliases: %s", e)
+        return jsonify({"error": "Failed to list share aliases"}), 500
+
+    resp = jsonify({"aliases": aliases})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.route("/api/analytics/config")

@@ -4,13 +4,20 @@
 
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
+  var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
+  var SHARE_EXPIRE_BTN_CLASS = "droppr-share-expire-btn";
+  var SHARE_EXPIRE_STORAGE_KEY = "droppr_share_expire_hours";
   var AUTO_SHARE_STYLE_ID = "droppr-auto-share-style";
   var AUTO_SHARE_MODAL_ID = "droppr-auto-share-modal";
+  var ICLOUD_WAIT_STYLE_ID = "droppr-icloud-wait-style";
+  var ICLOUD_WAIT_MODAL_ID = "droppr-icloud-wait";
 
   var uploadBatch = null;
   var tusUploads = {};
   var lastAutoSharedPath = null;
   var lastAutoSharedAt = 0;
+  var fileInputBypass = false;
+  var fileInputGate = null;
 
   function nowMs() {
     return new Date().getTime();
@@ -112,6 +119,307 @@
       '<span class="label">Analytics</span>';
 
     document.body.appendChild(a);
+  }
+
+  function ensureShareExpireStyles() {
+    if (document.getElementById(SHARE_EXPIRE_STYLE_ID)) return;
+
+    var style = document.createElement("style");
+    style.id = SHARE_EXPIRE_STYLE_ID;
+    style.textContent =
+      "." + SHARE_EXPIRE_BTN_CLASS + " { margin-left: 6px; }\n" +
+      "." + SHARE_EXPIRE_BTN_CLASS + "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
+    document.head.appendChild(style);
+  }
+
+  function isSharesPage() {
+    var p = String((window.location && window.location.pathname) || "");
+    return p.indexOf("/settings/shares") !== -1;
+  }
+
+  function extractShareHashFromHref(href) {
+    var s = String(href || "");
+    var m = s.match(/\/share\/([^/?#]+)/);
+    if (m && m[1]) return m[1];
+    m = s.match(/share\/([^/?#]+)/);
+    if (m && m[1]) return m[1];
+    return null;
+  }
+
+  function getDefaultShareExpireHours() {
+    var stored = null;
+    try {
+      stored = localStorage.getItem(SHARE_EXPIRE_STORAGE_KEY);
+    } catch (e) {
+      stored = null;
+    }
+    var n = parseIntOrNull(stored);
+    if (n == null || n < 0) return 30;
+    return n;
+  }
+
+  function updateShareExpire(shareHash, hours, sharePath) {
+    var token = getAuthToken();
+    if (!token) return Promise.reject(new Error("Not logged in"));
+
+    return fetch("/api/droppr/shares/" + encodeURIComponent(shareHash) + "/expire", {
+      method: "POST",
+      headers: {
+        "X-Auth": token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ hours: hours, path: sharePath || "" }),
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        if (!res.ok) {
+          throw new Error("Update failed (" + res.status + "): " + (text || ""));
+        }
+        if (!text) return {};
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return {};
+        }
+      });
+    });
+  }
+
+  function fmtRelativeExpire(unixSeconds) {
+    if (unixSeconds == null) return "";
+    var ts = parseInt(String(unixSeconds), 10);
+    if (isNaN(ts)) return "";
+    if (ts === 0) return "permanent";
+
+    var deltaSec = Math.floor((ts * 1000 - nowMs()) / 1000);
+    if (deltaSec <= 0) return "expired";
+
+    var days = Math.floor(deltaSec / 86400);
+    if (days >= 2) return "in " + days + " days";
+    if (days === 1) return "in 1 day";
+
+    var hours = Math.floor(deltaSec / 3600);
+    if (hours >= 2) return "in " + hours + " hours";
+    if (hours === 1) return "in 1 hour";
+
+    var minutes = Math.floor(deltaSec / 60);
+    if (minutes >= 2) return "in " + minutes + " minutes";
+    if (minutes === 1) return "in 1 minute";
+
+    return "in " + deltaSec + " seconds";
+  }
+
+  function fetchShareAliases(limit) {
+    var token = getAuthToken();
+    if (!token) return Promise.reject(new Error("Not logged in"));
+
+    var q = typeof limit === "number" ? ("?limit=" + String(limit)) : "";
+    return fetch("/api/droppr/shares/aliases" + q, {
+      method: "GET",
+      headers: { "X-Auth": token },
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        if (!res.ok) throw new Error("Aliases failed (" + res.status + "): " + (text || ""));
+        if (!text) return { aliases: [] };
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return { aliases: [] };
+        }
+      });
+    });
+  }
+
+  function applyAliasToShareRow(rowEl, alias) {
+    if (!rowEl || !alias) return;
+
+    var tds = rowEl.querySelectorAll ? rowEl.querySelectorAll("td") : null;
+    if (!tds || tds.length < 2) return;
+
+    var expireText = fmtRelativeExpire(alias.target_expire);
+    var base = expireText ? ("Aliased (" + expireText + ")") : "Aliased";
+    tds[1].textContent = base;
+  }
+
+  var _shareAliasesState = { loading: false, lastAppliedAt: 0, cache: null };
+
+  function ensureShareAliasesApplied() {
+    if (!isLoggedIn()) return;
+    if (!isSharesPage()) return;
+
+    var t = nowMs();
+    if (_shareAliasesState.lastAppliedAt && t - _shareAliasesState.lastAppliedAt < 2500) return;
+    if (_shareAliasesState.loading) return;
+
+    _shareAliasesState.loading = true;
+    fetchShareAliases(2000)
+      .then(function (payload) {
+        _shareAliasesState.cache = payload && payload.aliases ? payload.aliases : [];
+      })
+      .catch(function () {
+        _shareAliasesState.cache = [];
+      })
+      .then(function () {
+        _shareAliasesState.loading = false;
+        _shareAliasesState.lastAppliedAt = nowMs();
+
+        var aliases = _shareAliasesState.cache || [];
+        if (!aliases || aliases.length === 0) return;
+
+        var targets = {};
+        var byFrom = {};
+        for (var i = 0; i < aliases.length; i++) {
+          var a = aliases[i];
+          if (!a) continue;
+          if (a.to_hash) targets[String(a.to_hash)] = true;
+          if (a.from_hash) byFrom[String(a.from_hash)] = a;
+        }
+
+        var rows = document.querySelectorAll("tr");
+        for (var r = 0; r < rows.length; r++) {
+          var row = rows[r];
+          if (!row || !row.querySelector) continue;
+          var anchor = row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
+          if (!anchor) continue;
+          var hash = extractShareHashFromHref(anchor.getAttribute("href"));
+          if (!hash) continue;
+
+          if (targets[hash]) {
+            row.style.display = "none";
+            continue;
+          }
+
+          if (byFrom[hash]) {
+            applyAliasToShareRow(row, byFrom[hash]);
+          }
+        }
+      });
+  }
+
+  function ensureShareExpireButtons() {
+    if (!isLoggedIn()) return;
+    if (!isSharesPage()) return;
+
+    ensureShareExpireStyles();
+    ensureShareAliasesApplied();
+
+    var copyButtons = document.querySelectorAll("button.copy-clipboard");
+    for (var i = 0; i < copyButtons.length; i++) {
+      var copyBtn = copyButtons[i];
+      if (!copyBtn || !copyBtn.parentNode) continue;
+
+      var host = copyBtn.parentNode;
+      if (host.querySelector && host.querySelector("." + SHARE_EXPIRE_BTN_CLASS)) continue;
+
+      var row = null;
+      try {
+        row = copyBtn.closest ? copyBtn.closest("tr") : null;
+      } catch (e) {
+        row = null;
+      }
+      if (!row || !row.querySelector) continue;
+
+      var shareAnchor = row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
+      if (!shareAnchor) continue;
+
+      var shareHash = extractShareHashFromHref(shareAnchor.getAttribute("href"));
+      if (!shareHash) continue;
+
+      var sharePath = String(shareAnchor.textContent || "").trim();
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action " + SHARE_EXPIRE_BTN_CLASS;
+      btn.setAttribute("aria-label", "Change share expiration");
+      btn.title = "Change share expiration";
+      btn.innerHTML = '<i class="material-icons">schedule</i>';
+
+      (function (hash, pathLabel, buttonEl, rowEl) {
+        buttonEl.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          var defaultHours = getDefaultShareExpireHours();
+          var promptText =
+            "Set share duration in hours from now (0 = permanent)\n\n" +
+            (pathLabel ? ("Path: " + pathLabel + "\n") : "") +
+            "Share: " + hash;
+          var raw = null;
+          try {
+            raw = window.prompt(promptText, String(defaultHours));
+          } catch (e2) {
+            raw = null;
+          }
+          if (raw == null) return;
+
+          var rawTrim = String(raw).trim();
+          if (rawTrim === "") rawTrim = "0";
+          if (!/^[0-9]+$/.test(rawTrim)) {
+            showAutoShareModal({
+              title: "Invalid duration",
+              subtitle: pathLabel || "",
+              url: "",
+              note: "Enter a whole number of hours (0 = permanent).",
+              autoCopy: false,
+            });
+            return;
+          }
+
+          var hours = parseInt(rawTrim, 10);
+          if (isNaN(hours) || hours < 0) {
+            showAutoShareModal({
+              title: "Invalid duration",
+              subtitle: pathLabel || "",
+              url: "",
+              note: "Hours must be 0 or greater.",
+              autoCopy: false,
+            });
+            return;
+          }
+
+          try {
+            localStorage.setItem(SHARE_EXPIRE_STORAGE_KEY, String(hours));
+          } catch (e3) {
+            // ignore
+          }
+
+          buttonEl.disabled = true;
+          updateShareExpire(hash, hours, pathLabel)
+            .then(function (data) {
+              var h = data && data.hash ? data.hash : hash;
+              var shareUrl = window.location.origin + "/api/public/dl/" + h;
+              var note = hours === 0 ? "Share is now permanent." : ("Share now expires in " + hours + " hours.");
+              note += " (Link stays the same.)";
+
+              if (rowEl && data) {
+                applyAliasToShareRow(rowEl, data);
+              }
+
+              showAutoShareModal({
+                title: "Share time updated",
+                subtitle: pathLabel || "",
+                url: shareUrl,
+                openUrl: window.location.origin + "/gallery/" + h,
+                note: note,
+                autoCopy: false,
+              });
+            })
+            .catch(function (err) {
+              showAutoShareModal({
+                title: "Could not update share time",
+                subtitle: pathLabel || "",
+                url: "",
+                note: String(err && err.message ? err.message : err),
+                autoCopy: false,
+              });
+            })
+            .then(function () {
+              buttonEl.disabled = false;
+            });
+        });
+      })(shareHash, sharePath, btn, row);
+
+      host.appendChild(btn);
+    }
   }
 
   function ensureAutoShareStyles() {
@@ -931,17 +1239,159 @@
     }
   }
 
-  // Validate that file is fully available (handles iCloud files still downloading)
-  function validateFileReadable(file) {
-    return new Promise(function (resolve) {
-      // Skip validation for small files (under 1MB)
-      if (file.size < 1024 * 1024) {
-        resolve(true);
-        return;
-      }
+  function isIOSDevice() {
+    try {
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
+      // iPadOS 13+ reports as "Macintosh" but still has touch points.
+      if (navigator.platform === "MacIntel" && navigator.maxTouchPoints && navigator.maxTouchPoints > 1) return true;
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  }
 
-      // Try to read first 64KB of the file to verify it's accessible
-      var slice = file.slice(0, 65536);
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function ensureIcloudWaitStyles() {
+    if (document.getElementById(ICLOUD_WAIT_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = ICLOUD_WAIT_STYLE_ID;
+    style.textContent =
+      "#" + ICLOUD_WAIT_MODAL_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  top: 18px;\n" +
+      "  left: 50%;\n" +
+      "  transform: translateX(-50%);\n" +
+      "  z-index: 2147483002;\n" +
+      "  width: 560px;\n" +
+      "  max-width: calc(100vw - 36px);\n" +
+      "  border-radius: 14px;\n" +
+      "  background: rgba(17, 24, 39, 0.98);\n" +
+      "  color: #e5e7eb;\n" +
+      "  border: 1px solid rgba(255,255,255,0.12);\n" +
+      "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  overflow: hidden;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .row {\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  gap: 10px;\n" +
+      "  padding: 14px;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .spinner {\n" +
+      "  width: 18px;\n" +
+      "  height: 18px;\n" +
+      "  border-radius: 999px;\n" +
+      "  border: 2px solid rgba(255,255,255,0.25);\n" +
+      "  border-top-color: rgba(99, 102, 241, 0.95);\n" +
+      "  animation: droppr-spin 1s linear infinite;\n" +
+      "  flex: 0 0 auto;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .txt {\n" +
+      "  flex: 1 1 auto;\n" +
+      "  min-width: 0;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .title {\n" +
+      "  font-size: 13px;\n" +
+      "  font-weight: 800;\n" +
+      "  color: #fff;\n" +
+      "  line-height: 1.15;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .status {\n" +
+      "  margin-top: 4px;\n" +
+      "  font-size: 12px;\n" +
+      "  color: rgba(229,231,235,0.82);\n" +
+      "  word-break: break-word;\n" +
+      "  line-height: 1.2;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .note {\n" +
+      "  margin-top: 6px;\n" +
+      "  font-size: 12px;\n" +
+      "  color: rgba(229,231,235,0.65);\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .btn {\n" +
+      "  flex: 0 0 auto;\n" +
+      "  cursor: pointer;\n" +
+      "  border: 1px solid rgba(255,255,255,0.12);\n" +
+      "  background: rgba(255,255,255,0.08);\n" +
+      "  color: #fff;\n" +
+      "  font-weight: 700;\n" +
+      "  font-size: 12px;\n" +
+      "  padding: 9px 11px;\n" +
+      "  border-radius: 10px;\n" +
+      "}\n" +
+      "#" + ICLOUD_WAIT_MODAL_ID + " .btn:hover {\n" +
+      "  filter: brightness(1.05);\n" +
+      "}\n" +
+      "@keyframes droppr-spin { to { transform: rotate(360deg); } }\n";
+    document.head.appendChild(style);
+  }
+
+  function showIcloudWaitModal() {
+    ensureIcloudWaitStyles();
+    var existing = document.getElementById(ICLOUD_WAIT_MODAL_ID);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    var modal = document.createElement("div");
+    modal.id = ICLOUD_WAIT_MODAL_ID;
+
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var spinner = document.createElement("div");
+    spinner.className = "spinner";
+
+    var txt = document.createElement("div");
+    txt.className = "txt";
+
+    var title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "Waiting for iCloud download…";
+
+    var status = document.createElement("div");
+    status.className = "status";
+    status.textContent = "Preparing upload…";
+
+    var note = document.createElement("div");
+    note.className = "note";
+    note.textContent = "Keep this tab open. Upload starts automatically once the file is ready.";
+
+    txt.appendChild(title);
+    txt.appendChild(status);
+    txt.appendChild(note);
+
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn";
+    cancel.textContent = "Cancel";
+
+    row.appendChild(spinner);
+    row.appendChild(txt);
+    row.appendChild(cancel);
+
+    modal.appendChild(row);
+    document.body.appendChild(modal);
+
+    return {
+      setStatus: function (text) {
+        status.textContent = text || "Preparing upload…";
+      },
+      onCancel: function (fn) {
+        cancel.addEventListener("click", fn);
+      },
+      dismiss: function () {
+        if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+      },
+    };
+  }
+
+  function readBlobAsArrayBuffer(blob, timeoutMs) {
+    return new Promise(function (resolve) {
       var reader = new FileReader();
       var timeout = null;
 
@@ -952,28 +1402,95 @@
       }
 
       reader.onload = function () {
+        var bytes = 0;
+        try {
+          bytes = reader.result && reader.result.byteLength ? reader.result.byteLength : 0;
+        } catch (e) {
+          bytes = 0;
+        }
         cleanup();
-        resolve(true);
+        resolve({ ok: true, bytes: bytes });
       };
 
       reader.onerror = function () {
         cleanup();
-        resolve(false);
+        resolve({ ok: false, bytes: 0 });
       };
 
-      // Set timeout for slow iCloud downloads
       timeout = setTimeout(function () {
         cleanup();
         try { reader.abort(); } catch (e) {}
-        resolve(false);
-      }, 5000);
+        resolve({ ok: false, bytes: 0 });
+      }, Math.max(1000, parseIntOrNull(timeoutMs) || 0));
 
       try {
-        reader.readAsArrayBuffer(slice);
+        reader.readAsArrayBuffer(blob);
       } catch (e) {
         cleanup();
-        resolve(false);
+        resolve({ ok: false, bytes: 0 });
       }
+    });
+  }
+
+  // Validate that file is fully available (handles iCloud files still downloading)
+  function validateFileReadable(file, opts) {
+    var options = opts || {};
+    var timeoutMs = parseIntOrNull(options.timeoutMs);
+    if (timeoutMs == null) timeoutMs = 15000;
+
+    return new Promise(function (resolve) {
+      if (!file) {
+        resolve(false);
+        return;
+      }
+
+      var size = 0;
+      try {
+        size = typeof file.size === "number" ? file.size : 0;
+      } catch (e) {
+        size = 0;
+      }
+
+      if (!size || size <= 0) {
+        resolve(false);
+        return;
+      }
+
+      var type = "";
+      try {
+        type = String(file.type || "");
+      } catch (e2) {
+        type = "";
+      }
+
+      var isVideo = type.indexOf("video/") === 0;
+      if (!isVideo && size < 1024 * 1024) {
+        resolve(true);
+        return;
+      }
+
+      var chunkSize = 65536;
+      var headEnd = Math.min(chunkSize, size);
+      var headBlob = file.slice(0, headEnd);
+
+      readBlobAsArrayBuffer(headBlob, timeoutMs).then(function (head) {
+        if (!head || !head.ok || head.bytes <= 0) {
+          resolve(false);
+          return;
+        }
+
+        var needTail = isVideo || size >= 1024 * 1024;
+        if (!needTail || size <= chunkSize) {
+          resolve(true);
+          return;
+        }
+
+        var tailStart = Math.max(0, size - chunkSize);
+        var tailBlob = file.slice(tailStart, size);
+        readBlobAsArrayBuffer(tailBlob, timeoutMs).then(function (tail) {
+          resolve(!!(tail && tail.ok && tail.bytes > 0));
+        });
+      });
     });
   }
 
@@ -995,6 +1512,92 @@
     }, 6000);
   }
 
+  function hasAnyZeroSize(files) {
+    if (!files || !files.length) return false;
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (!f) continue;
+      try {
+        if (typeof f.size === "number" && f.size === 0) return true;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return false;
+  }
+
+  function dispatchSyntheticChange(input) {
+    var ev;
+    try {
+      ev = new Event("change", { bubbles: true, cancelable: true });
+    } catch (e) {
+      try {
+        ev = document.createEvent("Event");
+        ev.initEvent("change", true, true);
+      } catch (e2) {
+        return;
+      }
+    }
+
+    fileInputBypass = true;
+    try {
+      input.dispatchEvent(ev);
+    } finally {
+      fileInputBypass = false;
+    }
+  }
+
+  function waitForFilesReadable(files, opts) {
+    var options = opts || {};
+    var token = options.token || { canceled: false };
+    var onStatus = options.onStatus || function () {};
+    var maxWaitMs = parseIntOrNull(options.maxWaitMs);
+    if (maxWaitMs == null) maxWaitMs = 20 * 60 * 1000;
+
+    var start = nowMs();
+
+    function elapsedSec() {
+      return Math.max(0, Math.round((nowMs() - start) / 1000));
+    }
+
+    function waitOne(file, index, total) {
+      var name = (file && file.name) ? String(file.name) : "file";
+      var attempt = 0;
+
+      function loop() {
+        if (token.canceled) return Promise.resolve(false);
+        if (nowMs() - start > maxWaitMs) return Promise.resolve(false);
+
+        attempt += 1;
+        var status = "Preparing " + (index + 1) + "/" + total + ": " + name + " (" + elapsedSec() + "s)";
+        onStatus(status);
+
+        return validateFileReadable(file, { timeoutMs: 15000 }).then(function (ok) {
+          if (ok) return true;
+          if (token.canceled) return false;
+          if (nowMs() - start > maxWaitMs) return false;
+          var delay = Math.min(8000, 600 + attempt * 450);
+          return sleep(delay).then(loop);
+        });
+      }
+
+      return loop();
+    }
+
+    var idx = 0;
+    function next() {
+      if (token.canceled) return Promise.resolve(false);
+      if (idx >= files.length) return Promise.resolve(true);
+      return waitOne(files[idx], idx, files.length).then(function (ok) {
+        if (!ok) return false;
+        idx += 1;
+        return next();
+      });
+    }
+
+    return next();
+  }
+
   function patchFileInputs() {
     if (window.__dropprFileInputPatched) return;
     window.__dropprFileInputPatched = true;
@@ -1003,28 +1606,79 @@
     document.addEventListener("change", function (e) {
       var input = e.target;
       if (!input || input.type !== "file" || !input.files || input.files.length === 0) return;
+      if (fileInputBypass) return;
 
       var files = Array.prototype.slice.call(input.files);
-      var largeFiles = files.filter(function (f) { return f.size >= 1024 * 1024; });
+      var shouldGate = isIOSDevice() || hasAnyZeroSize(files);
+      if (!shouldGate) return;
 
-      // Skip validation if no large files
-      if (largeFiles.length === 0) return;
+      // Block FileBrowser from starting the upload until iOS/iCloud has a fully-readable file.
+      e.stopImmediatePropagation();
+      e.preventDefault();
 
-      // Check if files are readable (validates iCloud downloads are complete)
-      var validationPromises = largeFiles.map(function (file) {
-        return validateFileReadable(file).then(function (ok) {
-          return { file: file, ok: ok };
-        });
-      });
+      if (fileInputGate && fileInputGate.cancel) fileInputGate.cancel();
 
-      Promise.all(validationPromises).then(function (results) {
-        var failed = results.filter(function (r) { return !r.ok; });
-        if (failed.length > 0) {
-          // Show warning for first failed file
-          showFileNotReadyWarning(failed[0].file.name);
-          console.warn("Droppr: File not ready for upload (possibly still downloading from iCloud):", failed[0].file.name);
+      var gate = { canceled: false, cancel: null };
+      fileInputGate = gate;
+
+      var overlay = null;
+      var overlayTimer = null;
+      var lastStatus = "Preparing upload…";
+
+      function setStatus(text) {
+        lastStatus = text || lastStatus;
+        if (overlay && overlay.setStatus) overlay.setStatus(lastStatus);
+      }
+
+      function cleanupOverlay() {
+        if (overlayTimer) {
+          clearTimeout(overlayTimer);
+          overlayTimer = null;
         }
-      });
+        if (overlay && overlay.dismiss) overlay.dismiss();
+        overlay = null;
+      }
+
+      gate.cancel = function () {
+        gate.canceled = true;
+        cleanupOverlay();
+      };
+
+      overlayTimer = setTimeout(function () {
+        if (gate.canceled) return;
+        // Another gate took over; don't show.
+        if (fileInputGate !== gate) return;
+        overlay = showIcloudWaitModal();
+        overlay.setStatus(lastStatus);
+        overlay.onCancel(function () {
+          gate.canceled = true;
+          cleanupOverlay();
+          try { input.value = ""; } catch (e2) {}
+        });
+      }, 350);
+
+      waitForFilesReadable(files, { token: gate, onStatus: setStatus, maxWaitMs: 20 * 60 * 1000 })
+        .then(function (ok) {
+          if (fileInputGate !== gate) return;
+          cleanupOverlay();
+          if (gate.canceled) return;
+          if (ok) {
+            dispatchSyntheticChange(input);
+            return;
+          }
+
+          var name = files && files[0] && files[0].name ? files[0].name : "";
+          showFileNotReadyWarning(name);
+          try { input.value = ""; } catch (e3) {}
+        })
+        .catch(function () {
+          if (fileInputGate !== gate) return;
+          cleanupOverlay();
+          if (gate.canceled) return;
+          var name = files && files[0] && files[0].name ? files[0].name : "";
+          showFileNotReadyWarning(name);
+          try { input.value = ""; } catch (e4) {}
+        });
     }, true);
   }
 
@@ -1032,8 +1686,10 @@
     patchUploadDetectors();
     patchFileInputs();
     ensureAnalyticsButton();
+    ensureShareExpireButtons();
     var observer = new MutationObserver(function () {
       ensureAnalyticsButton();
+      ensureShareExpireButtons();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
