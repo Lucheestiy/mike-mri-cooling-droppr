@@ -93,6 +93,27 @@ def get_video_codec(path: Path) -> str | None:
     return None
 
 
+def has_extra_data_streams(path: Path) -> bool:
+    """Check if video has extra data streams that can cause playback issues."""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "stream=codec_type",
+            "-of", "csv=p=0",
+            str(path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            streams = result.stdout.strip().split('\n')
+            data_count = sum(1 for s in streams if s == 'data' or s == 'unknown')
+            if data_count > 0:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def has_timestamp_errors(path: Path) -> bool:
     """Check if video has timestamp/dts errors that cause playback issues."""
     try:
@@ -133,6 +154,8 @@ def fix_video_errors(path: Path) -> bool:
             "-loglevel", "error",
             "-y",
             "-i", str(path),
+            "-map", "0:v:0",  # Only first video stream
+            "-map", "0:a:0?",  # Only first audio stream (optional)
             "-c:v", "libx264",
             "-preset", "fast",
             "-crf", "23",
@@ -274,6 +297,12 @@ def main() -> int:
         log(f"detected HEVC codec, transcoding to H.264: {path.name}")
         transcode_hevc_to_h264(path)
         return 0  # transcoding already includes faststart
+
+    # Check for extra data streams (iPhone metadata) that cause playback issues
+    if has_extra_data_streams(path):
+        log(f"detected extra data streams: {path.name}")
+        fix_video_errors(path)
+        return 0  # re-encoding strips extra streams and includes faststart
 
     # Check for timestamp errors that cause playback/seeking issues
     if has_timestamp_errors(path):
