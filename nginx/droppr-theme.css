@@ -17,6 +17,25 @@
     --droppr-overlay-border-soft: rgba(148, 163, 184, 0.22) !important;
     --droppr-overlay-text: rgba(241, 245, 249, 0.96) !important;
     --droppr-overlay-muted: rgba(203, 213, 225, 0.96) !important;
+
+    /* FileBrowser core theme variables (used by menus/dialogs/overlays) */
+    --blue: #6366f1 !important;
+    --dark-blue: #4f46e5 !important;
+    --action: #94a3b8 !important;
+    --background: #0f172a !important;
+    --surfacePrimary: #1e293b !important;
+    --surfaceSecondary: #334155 !important;
+    --divider: rgba(255, 255, 255, 0.10) !important;
+    --iconPrimary: #94a3b8 !important;
+    --iconSecondary: #f8fafc !important;
+    --iconTertiary: #64748b !important;
+    --textPrimary: rgba(148, 163, 184, 0.92) !important;
+    --textSecondary: rgba(241, 245, 249, 0.98) !important;
+    --hover: rgba(255, 255, 255, 0.08) !important;
+    --borderPrimary: rgba(255, 255, 255, 0.08) !important;
+    --borderSecondary: rgba(255, 255, 255, 0.14) !important;
+    --dividerPrimary: rgba(2, 6, 23, 0.55) !important;
+    --dividerSecondary: rgba(2, 6, 23, 0.78) !important;
 }
 
 /* Light Theme Variables */
@@ -39,6 +58,25 @@
     --droppr-overlay-border-soft: rgba(0, 0, 0, 0.12) !important;
     --droppr-overlay-text: rgba(30, 41, 59, 0.98) !important;
     --droppr-overlay-muted: rgba(71, 85, 105, 0.92) !important;
+
+    /* FileBrowser core theme variables (used by menus/dialogs/overlays) */
+    --blue: #4f46e5 !important;
+    --dark-blue: #4338ca !important;
+    --action: #475569 !important;
+    --background: #f8fafc !important;
+    --surfacePrimary: #ffffff !important;
+    --surfaceSecondary: #f1f5f9 !important;
+    --divider: rgba(0, 0, 0, 0.06) !important;
+    --iconPrimary: #475569 !important;
+    --iconSecondary: #ffffff !important;
+    --iconTertiary: #94a3b8 !important;
+    --textPrimary: rgba(71, 85, 105, 0.92) !important;
+    --textSecondary: rgba(30, 41, 59, 0.98) !important;
+    --hover: rgba(0, 0, 0, 0.04) !important;
+    --borderPrimary: rgba(0, 0, 0, 0.10) !important;
+    --borderSecondary: rgba(0, 0, 0, 0.16) !important;
+    --dividerPrimary: rgba(15, 23, 42, 0.10) !important;
+    --dividerSecondary: rgba(15, 23, 42, 0.18) !important;
 }
 
 body, #app, .v-application {

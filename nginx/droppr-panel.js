@@ -2,7 +2,7 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
-  var DROPPR_PANEL_VERSION = "20";
+  var DROPPR_PANEL_VERSION = "21";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
@@ -206,15 +206,25 @@
 
     // Set on both html and body for maximum compatibility
     document.documentElement.setAttribute("data-theme", theme);
-    document.body.setAttribute("data-theme", theme);
+    if (document.body) document.body.setAttribute("data-theme", theme);
 
     // Also add/remove class for FileBrowser Vue compatibility
     if (isDark) {
       document.documentElement.classList.remove("light-theme");
-      document.body.classList.remove("light-theme");
+      if (document.body) document.body.classList.remove("light-theme");
     } else {
       document.documentElement.classList.add("light-theme");
-      document.body.classList.add("light-theme");
+      if (document.body) document.body.classList.add("light-theme");
+    }
+
+    // FileBrowser's built-in theme variables use `:root.dark` (html.dark).
+    // Keep it in sync so dialogs/menus/overlays follow the selected theme.
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+      if (document.body) document.body.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      if (document.body) document.body.classList.remove("dark");
     }
 
     var btn = document.getElementById(THEME_TOGGLE_BTN_ID);
@@ -274,7 +284,8 @@
 
     // Initialize theme from prefs
     var theme = getTheme();
-    document.documentElement.setAttribute("data-theme", theme);
+    // Apply immediately (also sync FileBrowser's `:root.dark` class)
+    setTheme(theme);
 
     var btn = document.createElement("button");
     btn.id = THEME_TOGGLE_BTN_ID;
@@ -298,6 +309,9 @@
     }, false);
 
     document.body.appendChild(btn);
+
+    // Ensure button styling matches applied theme (setTheme may have run before the button existed)
+    setTheme(theme);
   }
 
   function ensureVideoMetaStyles() {
