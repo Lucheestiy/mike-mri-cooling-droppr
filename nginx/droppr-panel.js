@@ -2,7 +2,7 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
-  var DROPPR_PANEL_VERSION = "19";
+  var DROPPR_PANEL_VERSION = "20";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
@@ -312,12 +312,12 @@
       "  bottom: 74px;\n" +
       "  z-index: 2147482999;\n" +
       "  width: min(460px, calc(100vw - 36px));\n" +
-      "  background: rgba(15, 23, 42, 0.92);\n" +
-      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  background: var(--droppr-overlay-bg, rgba(15, 23, 42, 0.92));\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.14));\n" +
       "  border-radius: 14px;\n" +
       "  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.75);\n" +
       "  padding: 12px;\n" +
-      "  color: #f1f5f9;\n" +
+      "  color: var(--droppr-overlay-text, #f1f5f9);\n" +
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  display: none;\n" +
       "}\n" +
@@ -334,9 +334,9 @@
       "}\n" +
       "#" + VIDEO_META_PANEL_ID + " .close {\n" +
       "  appearance: none;\n" +
-      "  border: 1px solid rgba(255,255,255,0.2);\n" +
-      "  background: rgba(255,255,255,0.08);\n" +
-      "  color: #fff;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.2));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "  width: 28px;\n" +
       "  height: 28px;\n" +
       "  border-radius: 10px;\n" +
@@ -374,10 +374,10 @@
       "  margin-top: 10px;\n" +
       "  padding: 10px 12px;\n" +
       "  border-radius: 12px;\n" +
-      "  background: rgba(15, 23, 42, 0.85);\n" +
-      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  background: var(--droppr-overlay-bg-soft, rgba(15, 23, 42, 0.85));\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.14));\n" +
       "  box-shadow: 0 12px 26px -18px rgba(0,0,0,0.75);\n" +
-      "  color: #f1f5f9;\n" +
+      "  color: var(--droppr-overlay-text, #f1f5f9);\n" +
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  font-size: 12px;\n" +
       "  line-height: 1.35;\n" +
@@ -396,9 +396,9 @@
       "  margin-top: 6px;\n" +
       "  padding: 8px 10px;\n" +
       "  border-radius: 12px;\n" +
-      "  background: rgba(15, 23, 42, 0.78);\n" +
-      "  border: 1px solid rgba(148, 163, 184, 0.22);\n" +
-      "  color: rgba(248, 250, 252, 0.98) !important;\n" +
+      "  background: var(--droppr-overlay-bg-subtle, rgba(15, 23, 42, 0.78));\n" +
+      "  border: 1px solid var(--droppr-overlay-border-soft, rgba(148, 163, 184, 0.22));\n" +
+      "  color: var(--droppr-overlay-text, rgba(248, 250, 252, 0.98)) !important;\n" +
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  font-size: 11px;\n" +
       "  line-height: 1.35;\n" +
@@ -409,14 +409,14 @@
       "}\n" +
       "." + VIDEO_ROW_DETAILS_CLASS + " .line {\n" +
       "  display: block;\n" +
-      "  color: rgba(248, 250, 252, 0.98) !important;\n" +
+      "  color: var(--droppr-overlay-text, rgba(248, 250, 252, 0.98)) !important;\n" +
       "  white-space: normal;\n" +
       "  overflow-wrap: anywhere;\n" +
       "  word-break: break-word;\n" +
       "}\n" +
       "." + VIDEO_ROW_DETAILS_CLASS + " .muted {\n" +
       "  opacity: 0.88;\n" +
-      "  color: rgba(203, 213, 225, 0.96) !important;\n" +
+      "  color: var(--droppr-overlay-muted, rgba(203, 213, 225, 0.96)) !important;\n" +
       "}\n" +
       "." + VIDEO_DETAILS_ROW_CLASS + " {\n" +
       "  user-select: text;\n" +
@@ -427,8 +427,8 @@
       "  padding: 6px 8px;\n" +
       "  font-size: 10px;\n" +
       "  line-height: 1.25;\n" +
-      "  background: rgba(2, 6, 23, 0.84);\n" +
-      "  border-color: rgba(148, 163, 184, 0.24);\n" +
+      "  background: var(--droppr-overlay-bg, rgba(2, 6, 23, 0.84));\n" +
+      "  border-color: var(--droppr-overlay-border-soft, rgba(148, 163, 184, 0.24));\n" +
       "}\n";
 
     document.head.appendChild(style);
@@ -1659,9 +1659,9 @@
       "  width: 460px;\n" +
       "  max-width: calc(100vw - 36px);\n" +
       "  border-radius: 14px;\n" +
-      "  background: rgba(17, 24, 39, 0.98);\n" +
-      "  color: #e5e7eb;\n" +
-      "  border: 1px solid rgba(255,255,255,0.12);\n" +
+      "  background: var(--droppr-overlay-bg, rgba(17, 24, 39, 0.98));\n" +
+      "  color: var(--text-primary, #e5e7eb);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.12));\n" +
       "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
@@ -1677,20 +1677,20 @@
       "  font-size: 14px;\n" +
       "  font-weight: 800;\n" +
       "  line-height: 1.2;\n" +
-      "  color: #fff;\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .subtitle {\n" +
       "  font-size: 12px;\n" +
       "  line-height: 1.2;\n" +
       "  margin-top: 4px;\n" +
-      "  color: rgba(229,231,235,0.8);\n" +
+      "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "  word-break: break-word;\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .close {\n" +
       "  appearance: none;\n" +
       "  border: 0;\n" +
       "  background: transparent;\n" +
-      "  color: rgba(229,231,235,0.85);\n" +
+      "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.85));\n" +
       "  cursor: pointer;\n" +
       "  font-size: 18px;\n" +
       "  line-height: 1;\n" +
@@ -1698,7 +1698,7 @@
       "  border-radius: 10px;\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .close:hover {\n" +
-      "  background: rgba(255,255,255,0.08);\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .body {\n" +
       "  padding: 0 14px 14px 14px;\n" +
@@ -1712,10 +1712,10 @@
       "  flex: 1 1 auto;\n" +
       "  width: 100%;\n" +
       "  border-radius: 10px;\n" +
-      "  border: 1px solid rgba(255,255,255,0.12);\n" +
-      "  background: rgba(0,0,0,0.22);\n" +
+      "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
+      "  background: var(--input-bg, rgba(0,0,0,0.22));\n" +
       "  padding: 10px 10px;\n" +
-      "  color: #fff;\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "  font-size: 13px;\n" +
       "  outline: none;\n" +
       "}\n" +
@@ -1726,8 +1726,8 @@
       "#" + AUTO_SHARE_MODAL_ID + " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
-      "  border: 1px solid rgba(255,255,255,0.12);\n" +
-      "  background: rgba(99, 102, 241, 0.95);\n" +
+      "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
+      "  background: var(--accent-color, rgba(99, 102, 241, 0.95));\n" +
       "  color: #fff;\n" +
       "  font-weight: 800;\n" +
       "  font-size: 13px;\n" +
@@ -1735,7 +1735,8 @@
       "  border-radius: 10px;\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .btn.secondary {\n" +
-      "  background: rgba(255,255,255,0.08);\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "}\n" +
       "#" + AUTO_SHARE_MODAL_ID + " .btn:hover {\n" +
       "  filter: brightness(1.05);\n" +
@@ -1743,7 +1744,7 @@
       "#" + AUTO_SHARE_MODAL_ID + " .note {\n" +
       "  margin-top: 10px;\n" +
       "  font-size: 12px;\n" +
-      "  color: rgba(229,231,235,0.72);\n" +
+      "  color: var(--text-secondary, rgba(229,231,235,0.72));\n" +
       "}\n";
 
     document.head.appendChild(style);
@@ -2493,9 +2494,9 @@
       "  width: 560px;\n" +
       "  max-width: calc(100vw - 36px);\n" +
       "  border-radius: 14px;\n" +
-      "  background: rgba(17, 24, 39, 0.98);\n" +
-      "  color: #e5e7eb;\n" +
-      "  border: 1px solid rgba(255,255,255,0.12);\n" +
+      "  background: var(--droppr-overlay-bg, rgba(17, 24, 39, 0.98));\n" +
+      "  color: var(--text-primary, #e5e7eb);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.12));\n" +
       "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
@@ -2510,7 +2511,7 @@
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  border-radius: 999px;\n" +
-      "  border: 2px solid rgba(255,255,255,0.25);\n" +
+      "  border: 2px solid var(--border-color, rgba(255,255,255,0.25));\n" +
       "  border-top-color: rgba(99, 102, 241, 0.95);\n" +
       "  animation: droppr-spin 1s linear infinite;\n" +
       "  flex: 0 0 auto;\n" +
@@ -2522,27 +2523,27 @@
       "#" + ICLOUD_WAIT_MODAL_ID + " .title {\n" +
       "  font-size: 13px;\n" +
       "  font-weight: 800;\n" +
-      "  color: #fff;\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "  line-height: 1.15;\n" +
       "}\n" +
       "#" + ICLOUD_WAIT_MODAL_ID + " .status {\n" +
       "  margin-top: 4px;\n" +
       "  font-size: 12px;\n" +
-      "  color: rgba(229,231,235,0.82);\n" +
+      "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.82));\n" +
       "  word-break: break-word;\n" +
       "  line-height: 1.2;\n" +
       "}\n" +
       "#" + ICLOUD_WAIT_MODAL_ID + " .note {\n" +
       "  margin-top: 6px;\n" +
       "  font-size: 12px;\n" +
-      "  color: rgba(229,231,235,0.65);\n" +
+      "  color: var(--text-secondary, rgba(229,231,235,0.65));\n" +
       "}\n" +
       "#" + ICLOUD_WAIT_MODAL_ID + " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
-      "  border: 1px solid rgba(255,255,255,0.12);\n" +
-      "  background: rgba(255,255,255,0.08);\n" +
-      "  color: #fff;\n" +
+      "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
       "  font-weight: 700;\n" +
       "  font-size: 12px;\n" +
       "  padding: 9px 11px;\n" +
