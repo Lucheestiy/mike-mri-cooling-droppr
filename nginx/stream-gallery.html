@@ -127,9 +127,9 @@
         .file-name {
             font-size: 0.9rem;
             font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.3;
         }
 
         .file-meta {
@@ -871,8 +871,8 @@
                 const fileName = getFileName(file);
                 const progress = getVideoProgress(state.shareHash, filePath);
                 item.innerHTML = '<div class="file-thumb"><img src="' + getThumbnailUrl(state.shareHash, filePath) + '" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'&#128249;\'"></div>' +
-                    '<div class="file-info"><div class="file-name">' + fileName + '</div>' +
-                    '<div class="file-meta"><span>' + formatBytes(file.size) + '</span>' +
+                    '<div class="file-info"><div class="file-name" title="' + fileName + '">' + fileName + '</div>' +
+                    '<div class="file-meta"><span title="' + file.size.toLocaleString() + ' bytes">' + formatBytes(file.size) + '</span>' +
                     (progress ? '<span class="resume-badge">' + formatTime(progress.time) + '</span>' : '') +
                     '</div></div>';
                 item.onclick = function() { loadVideo(index); };

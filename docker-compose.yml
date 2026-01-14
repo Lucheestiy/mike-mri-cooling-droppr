@@ -20,7 +20,7 @@ services:
     ports:
       - "${DROPPR_HOST_PORT:-8098}:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-fixed/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
       - ./nginx/analytics.html:/usr/share/nginx/html/analytics.html:ro
       - ./nginx/media-viewer.html:/usr/share/nginx/html/media-viewer.html:ro
@@ -28,7 +28,7 @@ services:
       - ./nginx/test-media.html:/usr/share/nginx/html/test-media.html:ro
       - ./nginx/stream-gallery.html:/usr/share/nginx/html/stream-gallery.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
-      - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
+      - ./nginx-fixed/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
       - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
     depends_on:
       - app
