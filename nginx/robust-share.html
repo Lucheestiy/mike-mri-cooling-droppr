@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Shared Files</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.85);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-color: #059669;
+            --accent-hover: #047857;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(255, 255, 255, 0.06);
+            --hover-bg: rgba(255, 255, 255, 0.08);
+            --success-color: #10b981;
+            --error-color: #ef4444;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --input-bg: rgba(0, 0, 0, 0.04);
+            --hover-bg: rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-color);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .logo .material-icons {
+            font-size: 24px;
+        }
+
+        .share-title {
+            font-size: 20px;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .share-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .share-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .share-info .material-icons {
+            font-size: 18px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .copy-state {
+            min-width: 70px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 1000;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .theme-toggle .material-icons {
+            font-size: 21px;
+        }
+
+        /* Password gate */
+        #password-gate {
+            display: none;
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 32px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        #password-gate h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        #password-gate p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .gate-meta {
+            margin: -12px 0 22px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        #password-gate .input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        #password-gate input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        #password-gate .error {
+            margin-top: 12px;
+            padding: 8px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            color: #fca5a5;
+            font-size: 13px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+
+        .btn .material-icons {
+            font-size: 18px;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--input-bg);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Actions bar */
+        .actions-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 12px 16px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .selection-info {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-left: auto;
+            min-width: 150px;
+            text-align: right;
+        }
+
+        .download-format {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: var(--hover-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 13px;
+            user-select: none;
+        }
+
+        .download-format .material-icons {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .download-format select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 13px;
+            padding: 2px 18px 2px 2px;
+            cursor: pointer;
+        }
+
+        .download-format select:focus {
+            outline: none;
+        }
+
+        .download-help {
+            margin: -10px 0 18px;
+            padding: 10px 14px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .download-help summary {
+            cursor: pointer;
+            color: var(--text-primary);
+            font-weight: 700;
+            list-style: none;
+        }
+
+        .download-help summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .download-help ul {
+            margin: 10px 0 0;
+            padding-left: 18px;
+        }
+
+        .download-help code {
+            background: rgba(2, 6, 23, 0.35);
+            padding: 1px 6px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+        }
+
+        /* File browser */
+        #file-browser {
+            display: none;
+        }
+
+        .file-list {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .file-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.15s;
+        }
+
+        .file-row:last-child {
+            border-bottom: none;
+        }
+
+        .file-row:hover {
+            background: var(--hover-bg);
+        }
+
+        .file-row.selected {
+            background: rgba(5, 150, 105, 0.1);
+        }
+
+        .file-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: var(--input-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .file-icon .material-icons {
+            font-size: 24px;
+        }
+
+        .file-icon.folder {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .file-icon.image {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+        .file-icon.video {
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 12px;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .file-actions .btn {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(18px);
+            z-index: 1100;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.16s ease, transform 0.16s ease;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Folder header */
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: var(--hover-bg);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .folder-header:hover {
+            background: var(--input-bg);
+        }
+
+        .folder-header .material-icons {
+            font-size: 20px;
+            color: #f59e0b;
+        }
+
+        .folder-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+
+        .folder-contents {
+            display: none;
+        }
+
+        .folder-name {
+            font-weight: 600;
+        }
+
+        .folder-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        /* Progress indicator */
+        #download-progress {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 18px;
+            left: 18px;
+            max-width: 400px;
+            margin-left: auto;
+            padding: 16px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .progress-header span {
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--input-bg);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state .material-icons {
+            font-size: 48px;
+            opacity: 0.5;
+            margin-bottom: 16px;
+        }
+
+        /* Not found */
+        #not-found {
+            display: none;
+            text-align: center;
+            padding: 100px 20px;
+        }
+
+        #not-found .material-icons {
+            font-size: 64px;
+            color: var(--error-color);
+            margin-bottom: 16px;
+        }
+
+        #not-found h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        #not-found p {
+            color: var(--text-secondary);
+        }
+
+        /* Search/Filter Bar */
+        .search-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 2px 8px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+            background: var(--card-bg);
+        }
+
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 10px 8px 10px 4px;
+            outline: none;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-icon {
+            color: var(--text-muted);
+            margin-left: 4px;
+            user-select: none;
+        }
+
+        .search-clear-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            flex: 0 0 30px;
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .search-clear-btn:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .search-results-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding-left: 4px;
+            flex-wrap: wrap;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .actions-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .selection-info {
+                margin-left: 0;
+                text-align: center;
+                min-width: 0;
+            }
+
+            .search-results-info {
+                justify-content: center;
+                padding-left: 0;
+            }
+
+            .file-row {
+                flex-wrap: wrap;
+            }
+
+            .file-actions {
+                width: 100%;
+                margin-top: 8px;
+            }
+
+            .file-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading state -->
+        <div id="loading-state" class="loading">
+            <div class="spinner"></div>
+            <span>Loading share...</span>
+        </div>
+
+        <!-- Not found state -->
+        <div id="not-found">
+            <span class="material-icons">error_outline</span>
+            <h2>Share Not Found</h2>
+            <p>This share link may have been deleted or expired.</p>
+        </div>
+
+        <!-- Password gate -->
+        <div id="password-gate">
+            <span class="material-icons" style="font-size: 48px; color: var(--accent-color); margin-bottom: 16px;">lock</span>
+            <h2>Password Protected</h2>
+            <p>This share requires a password to access.</p>
+            <div class="gate-meta" id="password-share-meta"></div>
+            <div class="input-row">
+                <input type="password" id="password-input" placeholder="Enter password" autocomplete="off">
+                <button class="btn btn-primary" onclick="verifyPassword()">
+                    <span class="material-icons">login</span>
+                    Access
+                </button>
+            </div>
+            <div id="password-error" class="error" style="display: none;"></div>
+        </div>
+
+        <!-- File browser -->
+        <div id="file-browser">
+            <header class="header">
+                <div class="header-left">
+                    <div class="logo">
+                        <span class="material-icons">cloud_download</span>
+                    </div>
+                    <div>
+                        <h1 class="share-title" id="share-title">Shared Files</h1>
+                        <div class="share-info">
+                            <span><span class="material-icons">folder</span> <span id="file-count">0 files</span></span>
+                            <span><span class="material-icons">storage</span> <span id="total-size">0 MB</span></span>
+                            <span id="protection-state"><span class="material-icons">link</span> Public link</span>
+                            <span id="expiry-state"><span class="material-icons">event_available</span> No expiry</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="copy-link-btn" type="button" onclick="copyShareLink()">
+                        <span class="material-icons">content_copy</span>
+                        Copy Link
+                    </button>
+                    <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
+                </div>
+            </header>
+
+            <div class="search-container">
+                <div class="search-box">
+                    <span class="material-icons search-icon">search</span>
+                    <input type="text" id="search-input" placeholder="Search names, folders, paths" aria-label="Search shared files" autocomplete="off">
+                    <button type="button" id="search-clear-btn" class="search-clear-btn" onclick="clearSearch()" aria-label="Clear search" style="display: none;">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div id="search-results-info" class="search-results-info" style="display: none;">
+                    Showing <span id="filtered-files-count">0</span> of <span id="total-files-count">0</span> files
+                </div>
+            </div>
+
+            <div class="actions-bar">
+                <button class="btn btn-secondary" onclick="selectAll()">
+                    <span class="material-icons">select_all</span>
+                    <span id="select-all-label">Select All</span>
+                </button>
+                <button class="btn btn-secondary" onclick="deselectAll()">
+                    <span class="material-icons">deselect</span>
+                    <span id="deselect-all-label">Deselect All</span>
+                </button>
+                <button class="btn btn-primary" id="download-selected-btn" onclick="downloadSelected()" disabled>
+                    <span class="material-icons">download</span>
+                    Download Selected (<span id="selected-count">0</span>)
+                </button>
+                <button class="btn btn-primary" onclick="downloadAll()">
+                    <span class="material-icons">archive</span>
+                    Download All
+                </button>
+                <div class="download-format" title="ZIP is easiest to open. TAR streams well for very large downloads.">
+                    <span class="material-icons">tune</span>
+                    <select id="download-format">
+                        <option value="zip" selected>ZIP</option>
+                        <option value="tar">TAR</option>
+                        <option value="files">Files</option>
+                    </select>
+                </div>
+                <div class="selection-info">
+                    <span id="selected-size" role="status" aria-live="polite">No files selected</span>
+                </div>
+            </div>
+
+            <details class="download-help">
+                <summary>Download tips (no login required)</summary>
+                <ul>
+                    <li>Select <b>one</b> file to download it directly.</li>
+                    <li>Select multiple items: browsers can’t download a folder/many files as “real files” in one click, so Droppr bundles them into an archive (ZIP or TAR).</li>
+                    <li><b>ZIP</b> opens on Windows/macOS/iOS. <b>TAR</b> is best for very large datasets (streaming) — open with 7‑Zip or run <code>tar -xf file.tar</code>.</li>
+                    <li><b>Files</b> starts one download per file; your browser may ask to allow multiple downloads.</li>
+                </ul>
+            </details>
+
+            <div id="file-list" class="file-list">
+                <!-- Files will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Download progress -->
+        <div id="download-progress">
+            <div class="progress-header">
+                <span>Downloading...</span>
+                <button class="btn btn-secondary" style="padding: 4px 8px;" onclick="cancelDownload()">
+                    <span class="material-icons" style="font-size: 16px;">close</span>
+                </button>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-info">
+                <span id="progress-percent">0%</span>
+                <span id="progress-size">0 / 0 MB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle">
+        <span class="material-icons" id="theme-icon">dark_mode</span>
+    </button>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+        // State
+        const shareId = window.location.pathname.split('/').filter(Boolean).pop();
+        let sessionToken = null;
+        let shareInfo = null;
+        let allFiles = [];
+        let folderMap = {};
+        let selectedFiles = new Set();
+        let downloadController = null;
+        let rawShareData = null;
+        let visibleFiles = [];
+        let preSearchExpandedFolders = null;
+        let expandedFolders = new Set();
+
+        // Theme
+        function loadTheme() {
+            try {
+                const prefs = JSON.parse(localStorage.getItem('droppr_gallery_prefs') || '{}');
+                return prefs.theme || 'dark';
+            } catch {
+                return 'dark';
+            }
+        }
+
+        function saveTheme(theme) {
+            try {
+                const prefs = JSON.parse(localStorage.getItem('droppr_gallery_prefs') || '{}');
+                prefs.theme = theme;
+                localStorage.setItem('droppr_gallery_prefs', JSON.stringify(prefs));
+            } catch {}
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.body.setAttribute('data-theme', theme);
+            document.getElementById('theme-icon').textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+            saveTheme(theme);
+        }
+
+        function toggleTheme() {
+            const current = loadTheme();
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        // Initialize theme
+        setTheme(loadTheme());
+
+        // Utility functions
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function formatExpiry(ts) {
+            const n = Number(ts || 0);
+            if (!Number.isFinite(n) || n <= 0) return 'No expiry';
+            try {
+                return 'Expires ' + new Date(n * 1000).toLocaleString();
+            } catch {
+                return 'Expires soon';
+            }
+        }
+
+        function showToast(message) {
+            const el = document.getElementById('toast');
+            if (!el) return;
+            el.textContent = message || '';
+            el.classList.toggle('show', Boolean(message));
+            if (message) {
+                window.clearTimeout(showToast._timer);
+                showToast._timer = window.setTimeout(() => {
+                    el.classList.remove('show');
+                }, 1600);
+            }
+        }
+
+        function copyText(text) {
+            const value = String(text || '');
+            if (!value) return Promise.reject(new Error('empty'));
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(value);
+            }
+            return new Promise((resolve, reject) => {
+                const ta = document.createElement('textarea');
+                ta.value = value;
+                ta.setAttribute('readonly', 'readonly');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                try {
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    ok ? resolve() : reject(new Error('copy failed'));
+                } catch (err) {
+                    try { document.body.removeChild(ta); } catch {}
+                    reject(err);
+                }
+            });
+        }
+
+        function copyShareLink() {
+            const state = document.getElementById('copy-state');
+            const url = window.location.origin + window.location.pathname;
+            return copyText(url).then(() => {
+                if (state) state.textContent = 'Copied';
+                showToast('Link copied');
+                window.setTimeout(() => {
+                    if (state) state.textContent = '';
+                }, 1400);
+            }).catch(() => {
+                if (state) state.textContent = 'Copy failed';
+                showToast('Copy failed');
+            });
+        }
+
+        function updateShareMeta() {
+            if (!shareInfo) return;
+            const protection = document.getElementById('protection-state');
+            const expiry = document.getElementById('expiry-state');
+
+            if (protection) {
+                protection.innerHTML = `<span class="material-icons">${shareInfo.password_protected ? 'lock' : 'link'}</span> ${shareInfo.password_protected ? 'Password protected' : 'Public link'}`;
+            }
+            if (expiry) {
+                expiry.innerHTML = `<span class="material-icons">${shareInfo.expires_at ? 'event' : 'event_available'}</span> ${escapeHtml(formatExpiry(shareInfo.expires_at))}`;
+            }
+
+            const gateMeta = document.getElementById('password-share-meta');
+            if (gateMeta) {
+                const title = shareInfo.title || 'Shared files';
+                const count = Number(shareInfo.file_count || 0);
+                const countText = `${count} file${count !== 1 ? 's' : ''}`;
+                gateMeta.textContent = `${title} - ${countText} - ${formatExpiry(shareInfo.expires_at)}`;
+            }
+        }
+
+        function encodeURIComponentStrict(value) {
+            return encodeURIComponent(String(value)).replace(/'/g, '%27');
+        }
+
+        function getFileIcon(file) {
+            const ext = (file.extension || '').toLowerCase();
+            const type = file.type || '';
+
+            if (type === 'image' || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'avif'].includes(ext)) {
+                return { icon: 'image', class: 'image' };
+            }
+            if (type === 'video' || ['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v'].includes(ext)) {
+                return { icon: 'movie', class: 'video' };
+            }
+            if (['pdf'].includes(ext)) {
+                return { icon: 'picture_as_pdf', class: '' };
+            }
+            if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
+                return { icon: 'description', class: '' };
+            }
+            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+                return { icon: 'archive', class: '' };
+            }
+            return { icon: 'insert_drive_file', class: '' };
+        }
+
+        function getHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+            if (sessionToken) {
+                headers['X-Session-Token'] = sessionToken;
+            }
+            return headers;
+        }
+
+        // API functions
+        async function init() {
+            if (!shareId || !shareId.startsWith('RS_')) {
+                showNotFound();
+                return;
+            }
+
+            try {
+                const resp = await fetch(`/api/robust-share/${shareId}/info`);
+                if (!resp.ok) {
+                    showNotFound();
+                    return;
+                }
+
+                shareInfo = await resp.json();
+                if (shareInfo && shareInfo.title) {
+                    document.title = shareInfo.title;
+                }
+                updateShareMeta();
+                document.getElementById('loading-state').style.display = 'none';
+
+                if (shareInfo.password_protected) {
+                    document.getElementById('password-gate').style.display = 'block';
+                    document.getElementById('password-input').focus();
+                } else {
+                    await loadFileList();
+                }
+            } catch (err) {
+                console.error('Init error:', err);
+                showNotFound();
+            }
+        }
+
+        function showNotFound() {
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('not-found').style.display = 'block';
+        }
+
+        async function verifyPassword() {
+            const password = document.getElementById('password-input').value;
+            const errorEl = document.getElementById('password-error');
+            errorEl.style.display = 'none';
+
+            if (!password) {
+                errorEl.textContent = 'Please enter a password';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const resp = await fetch(`/api/robust-share/${shareId}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await resp.json();
+
+                if (data.valid) {
+                    sessionToken = data.token;
+                    document.getElementById('password-gate').style.display = 'none';
+                    await loadFileList();
+                } else {
+                    errorEl.textContent = data.error || 'Invalid password';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Failed to verify password';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        async function loadFileList() {
+            try {
+                const url = `/api/robust-share/${shareId}/files${sessionToken ? '?token=' + sessionToken : ''}`;
+                const resp = await fetch(url, { headers: getHeaders() });
+
+                if (!resp.ok) {
+                    if (resp.status === 401) {
+                        document.getElementById('file-browser').style.display = 'none';
+                        document.getElementById('password-gate').style.display = 'block';
+                        return;
+                    }
+                    throw new Error('Failed to load files');
+                }
+
+                const data = await resp.json();
+                rawShareData = data;
+                allFiles = data.all_files || [];
+
+                // Update header
+                document.getElementById('share-title').textContent = data.title || 'Shared Files';
+                document.title = data.title || 'Shared Files';
+                document.getElementById('file-count').textContent = `${data.file_count} file${data.file_count !== 1 ? 's' : ''}`;
+                document.getElementById('total-size').textContent = formatBytes(data.total_size);
+                updateShareMeta();
+
+                filterAndRender();
+                document.getElementById('file-browser').style.display = 'block';
+            } catch (err) {
+                console.error('Load files error:', err);
+                document.getElementById('file-list').innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-icons">error_outline</span>
+                        <p>Failed to load files</p>
+                    </div>
+                `;
+                document.getElementById('file-browser').style.display = 'block';
+            }
+        }
+
+        function renderFileList(data) {
+            const container = document.getElementById('file-list');
+            const files = data.files || [];
+            const folders = data.folders || [];
+            const query = getSearchQuery();
+            folderMap = {};
+
+            if (files.length === 0 && folders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-icons">folder_off</span>
+                        <p>${query ? 'No matching files' : 'No files in this share'}</p>
+                    </div>
+                `;
+                updateSelectionInfo();
+                return;
+            }
+
+            let html = '';
+
+            // Render folders
+            folders.forEach(folder => {
+                const folderName = folder.name || 'Folder';
+                const folderFiles = Array.isArray(folder.files) ? folder.files : [];
+                const folderSize = Number.isFinite(folder.size)
+                    ? folder.size
+                    : folderFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+                const folderKey = encodeURIComponentStrict(folderName);
+                const safeFolder = { ...folder, name: folderName, files: folderFiles, size: folderSize };
+                folderMap[folderKey] = safeFolder;
+                const isExpanded = expandedFolders.has(folderKey);
+                html += `
+                    <div class="folder-header" onclick="toggleFolder('${folderKey}')">
+                        <input type="checkbox" class="folder-checkbox" id="folder-cb-${folderKey}"
+                               onclick="event.stopPropagation()"
+                               onchange="toggleFolderSelection('${folderKey}', this.checked)">
+                        <span class="material-icons">folder</span>
+                        <span class="folder-name">${escapeHtml(folderName)}</span>
+                        <span class="folder-meta">${folderFiles.length} files • ${formatBytes(folderSize)}</span>
+                        <span class="material-icons" id="folder-icon-${folderKey}">${isExpanded ? 'expand_more' : 'chevron_right'}</span>
+                    </div>
+                    <div id="folder-${folderKey}" class="folder-contents" style="display: ${isExpanded ? 'block' : 'none'};">
+                `;
+
+                folderFiles.forEach(file => {
+                    html += renderFileRow(file);
+                });
+
+                html += '</div>';
+            });
+
+            // Render root files
+            files.forEach(file => {
+                html += renderFileRow(file);
+            });
+
+            container.innerHTML = html;
+            updateSelectionInfo();
+        }
+
+        function renderFileRow(file) {
+            const icon = getFileIcon(file);
+            const isSelected = selectedFiles.has(file.path);
+            const pathEncoded = encodeURIComponentStrict(file.path);
+            const nameEncoded = encodeURIComponentStrict(file.name);
+
+            return `
+                <div class="file-row${isSelected ? ' selected' : ''}" data-path="${escapeHtml(file.path)}"
+                     onclick="toggleFileFromRow('${pathEncoded}')">
+                    <input type="checkbox" class="file-checkbox"
+                           ${isSelected ? 'checked' : ''}
+                           onclick="event.stopPropagation()"
+                           onchange="toggleFile('${pathEncoded}', this.checked)">
+                    <div class="file-icon ${icon.class}">
+                        <span class="material-icons">${icon.icon}</span>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name" title="${escapeHtml(file.path)}">${escapeHtml(file.name)}</div>
+                        <div class="file-meta">
+                            <span>${file.extension ? file.extension.toUpperCase() : 'File'}</span>
+                            <span>${formatBytes(file.size)}</span>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); downloadFile('${pathEncoded}', '${nameEncoded}')">
+                            <span class="material-icons">download</span>
+                            Download
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleFolder(folderKey) {
+            const contents = document.getElementById('folder-' + folderKey);
+            const icon = document.getElementById('folder-icon-' + folderKey);
+            if (!contents || !icon) return;
+            if (contents.style.display === 'none') {
+                contents.style.display = 'block';
+                icon.textContent = 'expand_more';
+                expandedFolders.add(folderKey);
+            } else {
+                contents.style.display = 'none';
+                icon.textContent = 'chevron_right';
+                expandedFolders.delete(folderKey);
+            }
+        }
+
+        // Selection functions
+        function toggleFile(pathEncoded, checked) {
+            const path = decodeURIComponent(pathEncoded);
+            if (checked) {
+                selectedFiles.add(path);
+            } else {
+                selectedFiles.delete(path);
+            }
+            updateSelectionInfo();
+            updateRowStyles();
+        }
+
+        function toggleFileFromRow(pathEncoded) {
+            const path = decodeURIComponent(pathEncoded);
+            const isSelected = selectedFiles.has(path);
+            if (isSelected) {
+                selectedFiles.delete(path);
+            } else {
+                selectedFiles.add(path);
+            }
+            updateCheckboxes();
+            updateSelectionInfo();
+            updateRowStyles();
+        }
+
+        function toggleFolderSelection(folderKey, checked) {
+            const folder = folderMap[folderKey];
+            if (!folder || !Array.isArray(folder.files)) return;
+
+            folder.files.forEach(file => {
+                if (!file || !file.path) return;
+                if (checked) {
+                    selectedFiles.add(file.path);
+                } else {
+                    selectedFiles.delete(file.path);
+                }
+            });
+
+            updateCheckboxes();
+            updateSelectionInfo();
+            updateRowStyles();
+        }
+
+        function selectAll() {
+            const listToSelect = getVisibleFiles();
+            listToSelect.forEach(file => {
+                if (file && file.path) selectedFiles.add(file.path);
+            });
+            updateCheckboxes();
+            updateSelectionInfo();
+            updateRowStyles();
+        }
+
+        function deselectAll() {
+            const query = getSearchQuery();
+            if (query) {
+                const listToDeselect = getVisibleFiles();
+                listToDeselect.forEach(file => {
+                    if (file && file.path) selectedFiles.delete(file.path);
+                });
+            } else {
+                selectedFiles.clear();
+            }
+            updateCheckboxes();
+            updateSelectionInfo();
+            updateRowStyles();
+        }
+
+        function updateCheckboxes() {
+            document.querySelectorAll('.file-checkbox').forEach(cb => {
+                const row = cb.closest('.file-row');
+                if (row) {
+                    const path = row.getAttribute('data-path');
+                    cb.checked = selectedFiles.has(path);
+                }
+            });
+        }
+
+        function updateRowStyles() {
+            document.querySelectorAll('.file-row').forEach(row => {
+                const path = row.getAttribute('data-path');
+                if (selectedFiles.has(path)) {
+                    row.classList.add('selected');
+                } else {
+                    row.classList.remove('selected');
+                }
+            });
+        }
+
+        function updateSelectionInfo() {
+            const count = selectedFiles.size;
+            document.getElementById('selected-count').textContent = count;
+            document.getElementById('download-selected-btn').disabled = count === 0;
+
+            let totalSize = 0;
+            allFiles.forEach(file => {
+                if (selectedFiles.has(file.path)) {
+                    totalSize += file.size || 0;
+                }
+            });
+            document.getElementById('selected-size').textContent = count === 0
+                ? 'No files selected'
+                : `${count} file${count !== 1 ? 's' : ''} selected, ${formatBytes(totalSize)}`;
+            updateFolderCheckboxes();
+        }
+
+        function updateFolderCheckboxes() {
+            Object.keys(folderMap).forEach(folderKey => {
+                const folder = folderMap[folderKey];
+                const cb = document.getElementById('folder-cb-' + folderKey);
+                if (!cb || !folder || !Array.isArray(folder.files)) return;
+
+                const total = folder.files.length;
+                let selectedCount = 0;
+                folder.files.forEach(file => {
+                    if (file && file.path && selectedFiles.has(file.path)) {
+                        selectedCount += 1;
+                    }
+                });
+
+                if (selectedCount === 0) {
+                    cb.checked = false;
+                    cb.indeterminate = false;
+                } else if (selectedCount === total) {
+                    cb.checked = true;
+                    cb.indeterminate = false;
+                } else {
+                    cb.checked = false;
+                    cb.indeterminate = true;
+                }
+            });
+        }
+
+        // Download functions
+        function downloadFile(pathEncoded, nameEncoded) {
+            const path = decodeURIComponent(pathEncoded);
+            const name = decodeURIComponent(nameEncoded);
+            const url = `/api/robust-share/${shareId}/download/${encodeURIComponentStrict(path)}${sessionToken ? '?token=' + sessionToken : ''}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function downloadAll() {
+            const fmtRaw = getDownloadFormat();
+            const fmt = fmtRaw === 'files' ? 'zip' : fmtRaw;
+            const params = [];
+            if (fmt && fmt !== 'tar') {
+                params.push('format=' + encodeURIComponentStrict(fmt));
+            }
+            if (sessionToken) {
+                params.push('token=' + encodeURIComponentStrict(sessionToken));
+            }
+            const url = `/api/robust-share/${shareId}/download-all${params.length ? '?' + params.join('&') : ''}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (shareInfo.title || shareId) + (fmt === 'zip' ? '.zip' : '.tar');
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function getDownloadFormat() {
+            const el = document.getElementById('download-format');
+            const v = (el && el.value) ? String(el.value) : 'zip';
+            if (v === 'zip' || v === 'tar' || v === 'files') return v;
+            return 'zip';
+        }
+
+        async function downloadSelected() {
+            if (selectedFiles.size === 0) return;
+
+            if (selectedFiles.size === 1) {
+                // Single file - direct download
+                const path = Array.from(selectedFiles)[0];
+                const file = allFiles.find(f => f.path === path);
+                if (file) {
+                    downloadFile(encodeURIComponentStrict(path), encodeURIComponentStrict(file.name));
+                }
+                return;
+            }
+
+            const fmt = getDownloadFormat();
+            if (fmt === 'files') {
+                const files = Array.from(selectedFiles);
+                if (files.length > 20) {
+                    const ok = window.confirm(`This will start ${files.length} separate downloads. Your browser may ask to allow multiple downloads.\n\nContinue?`);
+                    if (!ok) return;
+                }
+                // Sequentially trigger downloads to reduce popup-blocker issues.
+                for (let i = 0; i < files.length; i++) {
+                    const path = files[i];
+                    const file = allFiles.find(f => f.path === path);
+                    if (!file) continue;
+                    downloadFile(encodeURIComponentStrict(path), encodeURIComponentStrict(file.name));
+                    await new Promise(r => setTimeout(r, 250));
+                }
+                return;
+            }
+
+            // Multiple files - prefer a GET download URL (more compatible across browsers).
+            const files = Array.from(selectedFiles);
+            const filesJson = JSON.stringify(files);
+            const urlBase = `/api/robust-share/${shareId}/download-selected`;
+
+            const params = [];
+            params.push('files=' + encodeURIComponentStrict(filesJson));
+            if (fmt && fmt !== 'tar') {
+                params.push('format=' + encodeURIComponentStrict(fmt));
+            }
+            if (sessionToken) {
+                params.push('token=' + encodeURIComponentStrict(sessionToken));
+            }
+            const url = urlBase + '?' + params.join('&');
+
+            // If the URL is too long, fall back to a POST in a new tab.
+            if (url.length > 1800) {
+                const postParams = [];
+                if (fmt && fmt !== 'tar') {
+                    postParams.push('format=' + encodeURIComponentStrict(fmt));
+                }
+                if (sessionToken) {
+                    postParams.push('token=' + encodeURIComponentStrict(sessionToken));
+                }
+                const postUrl = `${urlBase}${postParams.length ? '?' + postParams.join('&') : ''}`;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = postUrl;
+                form.target = '_blank';
+                form.style.display = 'none';
+
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'files';
+                input.value = filesJson;
+                form.appendChild(input);
+
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function cancelDownload() {
+            document.getElementById('download-progress').style.display = 'none';
+        }
+
+        // Handle enter key on password input
+        document.getElementById('password-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyPassword();
+            }
+        });
+
+        // Search and filter helper functions
+        function getSearchInput() {
+            return document.getElementById('search-input');
+        }
+
+        function getSearchQuery() {
+            const input = getSearchInput();
+            return (input ? input.value : '').trim().toLowerCase();
+        }
+
+        function getFolderFiles(folder) {
+            return Array.isArray(folder && folder.files) ? folder.files : [];
+        }
+
+        function getFileSearchText(file) {
+            return [
+                file && file.name,
+                file && file.path,
+                file && file.extension,
+                file && file.type,
+                file && file.content_type
+            ].filter(Boolean).map(String).join(' ').toLowerCase();
+        }
+
+        function fileMatchesSearch(file, query) {
+            return !query || getFileSearchText(file).includes(query);
+        }
+
+        function folderMatchesSearch(folder, query) {
+            return !query || String((folder && folder.name) || '').toLowerCase().includes(query);
+        }
+
+        function getVisibleFiles() {
+            return getSearchQuery() ? visibleFiles : allFiles;
+        }
+
+        function buildFilteredShareData(data) {
+            const query = getSearchQuery();
+            const files = Array.isArray(data && data.files) ? data.files : [];
+            const folders = Array.isArray(data && data.folders) ? data.folders : [];
+
+            if (!query) {
+                return {
+                    data,
+                    query,
+                    visible: allFiles.slice()
+                };
+            }
+
+            const filteredFiles = files.filter(file => fileMatchesSearch(file, query));
+            const visible = filteredFiles.slice();
+            const filteredFolders = folders.map(folder => {
+                const folderFiles = getFolderFiles(folder);
+                const folderMatched = folderMatchesSearch(folder, query);
+                const matchingFiles = folderFiles.filter(file => fileMatchesSearch(file, query));
+                const activeFiles = folderMatched ? folderFiles : matchingFiles;
+
+                if (activeFiles.length === 0) {
+                    return null;
+                }
+
+                visible.push(...activeFiles);
+                return {
+                    ...folder,
+                    files: activeFiles,
+                    size: activeFiles.reduce((sum, file) => sum + (file.size || 0), 0)
+                };
+            }).filter(Boolean);
+
+            return {
+                data: {
+                    ...data,
+                    files: filteredFiles,
+                    folders: filteredFolders
+                },
+                query,
+                visible
+            };
+        }
+
+        function updateSearchControls(query, visibleCount) {
+            const clearBtn = document.getElementById('search-clear-btn');
+            const resultsInfo = document.getElementById('search-results-info');
+            const filteredCount = document.getElementById('filtered-files-count');
+            const totalCount = document.getElementById('total-files-count');
+            const selectLabel = document.getElementById('select-all-label');
+            const deselectLabel = document.getElementById('deselect-all-label');
+            const isFiltered = Boolean(query);
+
+            if (clearBtn) clearBtn.style.display = isFiltered ? 'flex' : 'none';
+            if (resultsInfo) resultsInfo.style.display = isFiltered ? 'flex' : 'none';
+            if (filteredCount) filteredCount.textContent = visibleCount;
+            if (totalCount) totalCount.textContent = allFiles.length;
+            if (selectLabel) selectLabel.textContent = isFiltered ? 'Select Visible' : 'Select All';
+            if (deselectLabel) deselectLabel.textContent = isFiltered ? 'Deselect Visible' : 'Deselect All';
+        }
+
+        function filterAndRender() {
+            if (!rawShareData) return;
+            const filtered = buildFilteredShareData(rawShareData);
+            visibleFiles = filtered.visible;
+
+            if (filtered.query) {
+                if (preSearchExpandedFolders === null) {
+                    preSearchExpandedFolders = new Set(expandedFolders);
+                }
+                (filtered.data.folders || []).forEach(folder => {
+                    expandedFolders.add(encodeURIComponentStrict(folder.name || 'Folder'));
+                });
+            } else if (preSearchExpandedFolders !== null) {
+                expandedFolders = new Set(preSearchExpandedFolders);
+                preSearchExpandedFolders = null;
+            }
+
+            updateSearchControls(filtered.query, visibleFiles.length);
+            renderFileList(filtered.data);
+        }
+
+        function clearSearch() {
+            const input = getSearchInput();
+            if (input) {
+                input.value = '';
+                filterAndRender();
+                input.focus();
+            }
+        }
+
+        const searchInput = getSearchInput();
+        if (searchInput) {
+            searchInput.addEventListener('input', filterAndRender);
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    clearSearch();
+                }
+            });
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

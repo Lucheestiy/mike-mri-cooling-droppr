@@ -2,17 +2,16 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
-  var DROPPR_PANEL_VERSION = "28";
+  var DROPPR_PANEL_VERSION = "31";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
+  var MANAGE_BTN_ID = "droppr-manage-btn";
+  var MANAGE_STYLE_ID = "droppr-manage-style";
+  var DROPPR_SETTINGS_STYLE_ID = "droppr-settings-style";
+  var DROPPR_SETTINGS_CARD_ID = "droppr-settings-card";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
   var SHARE_EXPIRE_BTN_CLASS = "droppr-share-expire-btn";
   var SHARE_EXPIRE_STORAGE_KEY = "droppr_share_expire_hours";
-  var UPLOAD_TIMEOUT_STORAGE_KEY = "droppr_upload_timeout_seconds";
-  var MAX_WAIT_TIMEOUT_STORAGE_KEY = "droppr_max_wait_minutes";
-  var SETTINGS_BTN_ID = "droppr-settings-btn";
-  var SETTINGS_MODAL_ID = "droppr-settings-modal";
-  var SETTINGS_STYLE_ID = "droppr-settings-style";
   var AUTO_SHARE_STYLE_ID = "droppr-auto-share-style";
   var AUTO_SHARE_MODAL_ID = "droppr-auto-share-modal";
   var ICLOUD_WAIT_STYLE_ID = "droppr-icloud-wait-style";
@@ -31,6 +30,24 @@
   var STREAM_SHARE_STYLE_ID = "droppr-stream-share-style";
   var FILES_STREAM_SHARE_BTN_CLASS = "droppr-files-stream-share-btn";
   var FILES_STREAM_SHARE_STYLE_ID = "droppr-files-stream-share-style";
+  var QUICK_SHARE_BTN_CLASS = "droppr-quick-share-btn";
+  var QUICK_SHARE_STYLE_ID = "droppr-quick-share-style";
+  var ROBUST_SHARE_BTN_CLASS = "droppr-robust-share-btn";
+  var ROBUST_SHARE_STYLE_ID = "droppr-robust-share-style";
+  var ROBUST_SHARE_MODAL_ID = "droppr-robust-share-modal";
+  var ROBUST_SHARE_EXPIRE_STORAGE_KEY = "droppr_robust_share_expire_hours";
+  var UPLOAD_REQUEST_BTN_CLASS = "droppr-upload-request-btn";
+  var UPLOAD_REQUEST_STYLE_ID = "droppr-upload-request-style";
+  var UPLOAD_REQUEST_FAB_ID = "droppr-upload-request-fab";
+  var UPLOAD_REQUEST_MENU_ID = "droppr-upload-request-menu-item";
+  var UPLOAD_REQUEST_MODAL_ID = "droppr-upload-request-modal";
+  var UPLOAD_REQUEST_EXPIRE_STORAGE_KEY = "droppr_upload_request_expire_hours";
+  var SESSION_STYLE_ID = "droppr-session-style";
+  var SESSION_MODAL_ID = "droppr-session-modal";
+  var SESSION_TOKEN_HASH_KEY = "droppr_session_token_hash";
+  var SESSION_START_MS_KEY = "droppr_session_start_ms";
+  var SESSION_LAST_ACTIVITY_MS_KEY = "droppr_session_last_activity_ms";
+  var SESSION_IS_ADMIN_KEY = "droppr_session_is_admin";
 
   var uploadBatch = null;
   var tusUploads = {};
@@ -47,50 +64,11 @@
   var filesVideoHydrateTimer = null;
   var filesVideoLastPathname = null;
   var videoMetaDebugStats = { ok: 0, notFound: 0, unauth: 0, other: 0 };
-
-  // ============ FULL FOLDER/FILE NAME DISPLAY ============
-  var FULL_NAME_STYLE_ID = "droppr-full-name-style";
-  function ensureFullNameStyles() {
-    if (document.getElementById(FULL_NAME_STYLE_ID)) return;
-    var style = document.createElement("style");
-    style.id = FULL_NAME_STYLE_ID;
-    style.textContent =
-      "/* Show full folder/file names - no truncation */\n" +
-      ".item .name,\n" +
-      ".listing .name,\n" +
-      "#listing .name,\n" +
-      "[class*='listing'] .name,\n" +
-      ".item-name,\n" +
-      ".file-name,\n" +
-      ".folder-name,\n" +
-      ".v-list-item__title,\n" +
-      ".item span.name,\n" +
-      ".row.item span:not(.droppr-size-badge),\n" +
-      "#listing .item span:not(.droppr-size-badge) {\n" +
-      "  white-space: normal !important;\n" +
-      "  overflow: visible !important;\n" +
-      "  text-overflow: unset !important;\n" +
-      "  word-break: break-word !important;\n" +
-      "  overflow-wrap: break-word !important;\n" +
-      "  max-width: none !important;\n" +
-      "}\n" +
-      ".item,\n" +
-      ".row.item,\n" +
-      "#listing .item {\n" +
-      "  height: auto !important;\n" +
-      "  min-height: 40px !important;\n" +
-      "}\n" +
-      ".item .name,\n" +
-      ".row.item .name {\n" +
-      "  flex: 1 1 auto !important;\n" +
-      "  min-width: 0 !important;\n" +
-      "  line-height: 1.4 !important;\n" +
-      "  padding: 4px 0 !important;\n" +
-      "}\n";
-    document.head.appendChild(style);
-  }
-  // Inject full name styles immediately
-  ensureFullNameStyles();
+  var manageAdminCheckedAt = 0;
+  var manageAdminCheckInFlight = false;
+  var sessionSettingsAdminCheckedAt = 0;
+  var sessionSettingsAdminCheckInFlight = false;
+  var uploadRequestMenuLastEnsureAt = 0;
 
   function nowMs() {
     return new Date().getTime();
@@ -230,259 +208,91 @@
     document.body.appendChild(a);
   }
 
-  // ============ SETTINGS BUTTON & MODAL ============
-  function ensureSettingsStyles() {
-    if (document.getElementById(SETTINGS_STYLE_ID)) return;
+  // ============ MANAGER BUTTON ============
+  function ensureManageStyles() {
+    if (document.getElementById(MANAGE_STYLE_ID)) return;
     var style = document.createElement("style");
-    style.id = SETTINGS_STYLE_ID;
+    style.id = MANAGE_STYLE_ID;
     style.textContent =
-      "#" + SETTINGS_BTN_ID + " {\n" +
+      "#" + MANAGE_BTN_ID + " {\n" +
       "  position: fixed;\n" +
-      "  right: 140px;\n" +
-      "  bottom: 18px;\n" +
+      "  right: 18px;\n" +
+      "  bottom: 132px;\n" +
       "  z-index: 2147483000;\n" +
       "  display: inline-flex;\n" +
       "  align-items: center;\n" +
-      "  gap: 7px;\n" +
-      "  padding: 11px 16px;\n" +
-      "  border-radius: 26px;\n" +
-      "  background: rgba(55, 65, 81, 0.95);\n" +
-      "  color: #fff;\n" +
-      "  text-decoration: none;\n" +
-      "  cursor: pointer;\n" +
+      "  gap: 8px;\n" +
+      "  padding: 10px 12px;\n" +
+      "  border-radius: 999px;\n" +
+      "  background: rgba(16, 185, 129, 0.95);\n" +
+      "  color: #04120c !important;\n" +
+      "  text-decoration: none !important;\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  font-weight: 800;\n" +
       "  letter-spacing: -0.01em;\n" +
       "  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.65);\n" +
       "  border: 1px solid rgba(255,255,255,0.18);\n" +
       "  user-select: none;\n" +
       "}\n" +
-      "#" + SETTINGS_BTN_ID + ":hover {\n" +
-      "  background: rgba(75, 85, 99, 0.98);\n" +
+      "#" + MANAGE_BTN_ID + ":hover {\n" +
+      "  background: rgba(5, 150, 105, 0.98);\n" +
       "  transform: translateY(-1px);\n" +
       "}\n" +
-      "#" + SETTINGS_BTN_ID + " .icon {\n" +
+      "#" + MANAGE_BTN_ID + " .icon {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  display: inline-block;\n" +
       "}\n" +
-      "#" + SETTINGS_BTN_ID + " .label {\n" +
+      "#" + MANAGE_BTN_ID + " .label {\n" +
       "  font-size: 14px;\n" +
       "  line-height: 1;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " {\n" +
-      "  position: fixed;\n" +
-      "  top: 50%;\n" +
-      "  left: 50%;\n" +
-      "  transform: translate(-50%, -50%);\n" +
-      "  z-index: 2147483647;\n" +
-      "  min-width: 340px;\n" +
-      "  max-width: 90vw;\n" +
-      "  background: rgba(17, 24, 39, 0.98);\n" +
-      "  border: 1px solid rgba(255,255,255,0.15);\n" +
-      "  border-radius: 16px;\n" +
-      "  padding: 24px;\n" +
-      "  color: #f3f4f6;\n" +
-      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
-      "  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .title {\n" +
-      "  font-size: 18px;\n" +
-      "  font-weight: 700;\n" +
-      "  margin-bottom: 20px;\n" +
-      "  display: flex;\n" +
-      "  align-items: center;\n" +
-      "  gap: 10px;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .title-icon {\n" +
-      "  width: 24px;\n" +
-      "  height: 24px;\n" +
-      "  color: #818cf8;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .field {\n" +
-      "  margin-bottom: 16px;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .field-label {\n" +
-      "  display: block;\n" +
-      "  font-size: 13px;\n" +
-      "  font-weight: 600;\n" +
-      "  color: #d1d5db;\n" +
-      "  margin-bottom: 6px;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .field-hint {\n" +
-      "  font-size: 11px;\n" +
-      "  color: #9ca3af;\n" +
-      "  margin-top: 4px;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " input[type=number] {\n" +
-      "  width: 100%;\n" +
-      "  padding: 10px 12px;\n" +
-      "  font-size: 14px;\n" +
-      "  border: 1px solid rgba(255,255,255,0.2);\n" +
-      "  border-radius: 8px;\n" +
-      "  background: rgba(31, 41, 55, 0.8);\n" +
-      "  color: #f3f4f6;\n" +
-      "  outline: none;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " input[type=number]:focus {\n" +
-      "  border-color: #6366f1;\n" +
-      "  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .buttons {\n" +
-      "  display: flex;\n" +
-      "  justify-content: flex-end;\n" +
-      "  gap: 10px;\n" +
-      "  margin-top: 20px;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .btn {\n" +
-      "  padding: 10px 18px;\n" +
-      "  font-size: 14px;\n" +
-      "  font-weight: 600;\n" +
-      "  border-radius: 8px;\n" +
-      "  cursor: pointer;\n" +
-      "  border: none;\n" +
-      "  transition: all 0.15s ease;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .btn-cancel {\n" +
-      "  background: rgba(55, 65, 81, 0.8);\n" +
-      "  color: #d1d5db;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .btn-cancel:hover {\n" +
-      "  background: rgba(75, 85, 99, 0.9);\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .btn-save {\n" +
-      "  background: #6366f1;\n" +
-      "  color: #fff;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + " .btn-save:hover {\n" +
-      "  background: #818cf8;\n" +
-      "}\n" +
-      "#" + SETTINGS_MODAL_ID + "-overlay {\n" +
-      "  position: fixed;\n" +
-      "  top: 0;\n" +
-      "  left: 0;\n" +
-      "  right: 0;\n" +
-      "  bottom: 0;\n" +
-      "  background: rgba(0, 0, 0, 0.5);\n" +
-      "  z-index: 2147483646;\n" +
       "}\n";
     document.head.appendChild(style);
   }
 
-  function showSettingsModal() {
-    ensureSettingsStyles();
-    dismissSettingsModal();
-
-    var overlay = document.createElement("div");
-    overlay.id = SETTINGS_MODAL_ID + "-overlay";
-
-    var modal = document.createElement("div");
-    modal.id = SETTINGS_MODAL_ID;
-
-    var title = document.createElement("div");
-    title.className = "title";
-    title.innerHTML =
-      '<svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>' +
-      '<circle cx="12" cy="12" r="3"/>' +
-      "</svg>" +
-      "Upload Settings";
-
-    // Upload timeout field
-    var field1 = document.createElement("div");
-    field1.className = "field";
-
-    var label1 = document.createElement("label");
-    label1.className = "field-label";
-    label1.textContent = "File Validation Timeout (seconds)";
-
-    var input1 = document.createElement("input");
-    input1.type = "number";
-    input1.id = SETTINGS_MODAL_ID + "-upload-timeout";
-    input1.min = "5";
-    input1.max = "1800";
-    input1.value = getUploadTimeoutSeconds();
-
-    var hint1 = document.createElement("div");
-    hint1.className = "field-hint";
-    hint1.textContent = "Time to wait for each file chunk to be readable (5-1800 sec). Default: 1800s (30 min).";
-
-    field1.appendChild(label1);
-    field1.appendChild(input1);
-    field1.appendChild(hint1);
-
-    // Max wait timeout field
-    var field2 = document.createElement("div");
-    field2.className = "field";
-
-    var label2 = document.createElement("label");
-    label2.className = "field-label";
-    label2.textContent = "Max Wait Time (minutes)";
-
-    var input2 = document.createElement("input");
-    input2.type = "number";
-    input2.id = SETTINGS_MODAL_ID + "-max-wait";
-    input2.min = "1";
-    input2.max = "480";
-    input2.value = getMaxWaitMinutes();
-
-    var hint2 = document.createElement("div");
-    hint2.className = "field-hint";
-    hint2.textContent = "Maximum time to wait for queued files (1-480 min). Default: 480 min (8 hours).";
-
-    field2.appendChild(label2);
-    field2.appendChild(input2);
-    field2.appendChild(hint2);
-
-    // Buttons
-    var buttons = document.createElement("div");
-    buttons.className = "buttons";
-
-    var cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = "btn btn-cancel";
-    cancelBtn.textContent = "Cancel";
-    cancelBtn.onclick = dismissSettingsModal;
-
-    var saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.className = "btn btn-save";
-    saveBtn.textContent = "Save";
-    saveBtn.onclick = function () {
-      var timeout = parseIntOrNull(input1.value);
-      var maxWait = parseIntOrNull(input2.value);
-      if (timeout != null && timeout >= 5 && timeout <= 1800) {
-        setUploadTimeoutSeconds(timeout);
-      }
-      if (maxWait != null && maxWait >= 1 && maxWait <= 480) {
-        setMaxWaitMinutes(maxWait);
-      }
-      dismissSettingsModal();
-    };
-
-    buttons.appendChild(cancelBtn);
-    buttons.appendChild(saveBtn);
-
-    modal.appendChild(title);
-    modal.appendChild(field1);
-    modal.appendChild(field2);
-    modal.appendChild(buttons);
-
-    overlay.onclick = dismissSettingsModal;
-    document.body.appendChild(overlay);
-    document.body.appendChild(modal);
-
-    input1.focus();
-  }
-
-  function dismissSettingsModal() {
-    var overlay = document.getElementById(SETTINGS_MODAL_ID + "-overlay");
-    var modal = document.getElementById(SETTINGS_MODAL_ID);
-    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
-  }
-
-  function ensureSettingsButton() {
-    var existing = document.getElementById(SETTINGS_BTN_ID);
+  function ensureManageButton() {
+    var existing = document.getElementById(MANAGE_BTN_ID);
     if (!isLoggedIn()) {
+      if (existing && existing.parentNode) {
+        existing.parentNode.removeChild(existing);
+      }
+      return;
+    }
+
+    var token = getAuthToken();
+    var storedIsAdmin = null;
+    try {
+      storedIsAdmin = localStorage.getItem(SESSION_IS_ADMIN_KEY);
+    } catch (e) {
+      storedIsAdmin = null;
+    }
+
+    if (storedIsAdmin === "0") {
+      if (existing && existing.parentNode) {
+        existing.parentNode.removeChild(existing);
+      }
+      return;
+    }
+
+    if (storedIsAdmin !== "1") {
+      // Unknown: best-effort check, but do not spam.
+      var now = nowMs();
+      if (token && !manageAdminCheckInFlight && now - manageAdminCheckedAt > 30000) {
+        manageAdminCheckInFlight = true;
+        manageAdminCheckedAt = now;
+        detectIsAdmin(token)
+          .then(function (v) {
+            try {
+              localStorage.setItem(SESSION_IS_ADMIN_KEY, v ? "1" : "0");
+            } catch (e2) {}
+          })
+          .catch(function () {})
+          .finally(function () {
+            manageAdminCheckInFlight = false;
+            ensureManageButton();
+          });
+      }
+
       if (existing && existing.parentNode) {
         existing.parentNode.removeChild(existing);
       }
@@ -491,259 +301,21 @@
 
     if (existing) return;
 
-    ensureSettingsStyles();
+    ensureManageStyles();
 
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = SETTINGS_BTN_ID;
-    btn.title = "Upload Settings";
-    btn.innerHTML =
-      '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>' +
-      '<circle cx="12" cy="12" r="3"/>' +
+    var a = document.createElement("a");
+    a.id = MANAGE_BTN_ID;
+    a.href = "/manage";
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.title = "Droppr Manager (Robust Shares + File Requests)";
+    a.innerHTML =
+      '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M10.59 13.41L9.17 12l4.24-4.24l1.41 1.41L10.59 13.41zM7.05 14.83l-1.41-1.41l2.12-2.12l1.41 1.41l-2.12 2.12zM12 22a10 10 0 1 1 0-20a10 10 0 0 1 0 20Zm0-18a8 8 0 1 0 0 16a8 8 0 0 0 0-16Z"/>' +
       "</svg>" +
-      '<span class="label">Settings</span>';
+      '<span class="label">Manager</span>';
 
-    btn.onclick = showSettingsModal;
-    document.body.appendChild(btn);
-  }
-
-  // ============ FILE/FOLDER SIZE DISPLAY ============
-  var SIZE_BADGE_CLASS = "droppr-size-badge";
-  var SIZE_STYLE_ID = "droppr-size-style";
-  var folderSizeCache = {};
-  var folderSizeInFlight = {};
-
-  function ensureSizeStyles() {
-    if (document.getElementById(SIZE_STYLE_ID)) return;
-    var style = document.createElement("style");
-    style.id = SIZE_STYLE_ID;
-    style.textContent =
-      "." + SIZE_BADGE_CLASS + " {\n" +
-      "  display: inline-flex;\n" +
-      "  align-items: center;\n" +
-      "  gap: 4px;\n" +
-      "  padding: 3px 8px;\n" +
-      "  margin-left: 8px;\n" +
-      "  border-radius: 6px;\n" +
-      "  font-size: 12px;\n" +
-      "  font-weight: 600;\n" +
-      "  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n" +
-      "  background: rgba(99, 102, 241, 0.15);\n" +
-      "  color: #818cf8;\n" +
-      "  white-space: nowrap;\n" +
-      "  vertical-align: middle;\n" +
-      "}\n" +
-      "." + SIZE_BADGE_CLASS + ".folder {\n" +
-      "  background: rgba(34, 197, 94, 0.15);\n" +
-      "  color: #22c55e;\n" +
-      "  cursor: pointer;\n" +
-      "}\n" +
-      "." + SIZE_BADGE_CLASS + ".folder:hover {\n" +
-      "  background: rgba(34, 197, 94, 0.25);\n" +
-      "}\n" +
-      "." + SIZE_BADGE_CLASS + ".folder.loading {\n" +
-      "  opacity: 0.7;\n" +
-      "}\n" +
-      "." + SIZE_BADGE_CLASS + " .size-icon {\n" +
-      "  width: 12px;\n" +
-      "  height: 12px;\n" +
-      "}\n";
-    document.head.appendChild(style);
-  }
-
-  function getItemPathFromRow(rowEl) {
-    if (!rowEl) return null;
-    // Try data attributes first
-    var path = rowEl.getAttribute("data-path") || rowEl.getAttribute("data-url");
-    if (path) return path;
-    // Try href from links
-    var links = rowEl.querySelectorAll("a[href]");
-    for (var i = 0; i < links.length; i++) {
-      var href = links[i].getAttribute("href") || "";
-      if (href.indexOf("/files/") === 0) {
-        return decodeURIComponent(href.replace("/files", ""));
-      }
-    }
-    // Build path from current URL + item name (FileBrowser v2.x structure)
-    var nameEl = rowEl.querySelector(".name");
-    var itemName = rowEl.getAttribute("aria-label") || (nameEl ? nameEl.textContent.trim() : null);
-    if (itemName) {
-      var currentPath = window.location.pathname.replace(/^\/files\/?/, "/").replace(/\/$/, "");
-      return currentPath + "/" + itemName;
-    }
-    return null;
-  }
-
-  function isRowFolder(rowEl) {
-    if (!rowEl) return false;
-    // Check data-dir attribute (FileBrowser v2.x)
-    if (rowEl.getAttribute("data-dir") === "true") return true;
-    // Check for folder icon or class
-    if (rowEl.querySelector('i.material-icons:not(.action)')) {
-      var icon = rowEl.querySelector('i.material-icons:not(.action)');
-      if (icon && icon.textContent && icon.textContent.trim() === "folder") return true;
-    }
-    if (rowEl.classList && rowEl.classList.contains("dir")) return true;
-    if (rowEl.querySelector(".folder-icon, .icon-folder, [data-type='directory']")) return true;
-    // Check SVG icons
-    var svgs = rowEl.querySelectorAll("svg");
-    for (var i = 0; i < svgs.length; i++) {
-      var svg = svgs[i];
-      if (svg.innerHTML && svg.innerHTML.indexOf("folder") !== -1) return true;
-    }
-    return false;
-  }
-
-  function fetchFolderSize(path) {
-    var token = getAuthToken();
-    if (!token) return Promise.resolve(null);
-    // Use FileBrowser API to get folder contents recursively
-    var encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
-    return fetch("/api/resources" + encodedPath, {
-      headers: { "X-Auth": token }
-    })
-      .then(function (res) {
-        if (!res.ok) return null;
-        return res.json();
-      })
-      .then(function (data) {
-        if (!data || !data.items) return data && data.size ? data.size : null;
-        var items = data.items || [];
-        var total = 0;
-        var subfolderPromises = [];
-
-        for (var i = 0; i < items.length; i++) {
-          var item = items[i];
-          if (!item) continue;
-          if (item.isDir) {
-            // Recursively fetch subfolder size
-            var subPath = path.replace(/\/$/, "") + "/" + item.name;
-            subfolderPromises.push(fetchFolderSize(subPath));
-          } else if (typeof item.size === "number") {
-            total += item.size;
-          }
-        }
-
-        if (subfolderPromises.length === 0) {
-          return total;
-        }
-
-        return Promise.all(subfolderPromises).then(function (subSizes) {
-          for (var j = 0; j < subSizes.length; j++) {
-            if (typeof subSizes[j] === "number") {
-              total += subSizes[j];
-            }
-          }
-          return total;
-        });
-      })
-      .catch(function () {
-        return null;
-      });
-  }
-
-  function addSizeBadgeToRow(rowEl, nameEl) {
-    if (!rowEl || !nameEl) return;
-    // Check if badge already exists
-    if (rowEl.querySelector("." + SIZE_BADGE_CLASS)) return;
-
-    ensureSizeStyles();
-
-    var isFolder = isRowFolder(rowEl);
-    var path = getItemPathFromRow(rowEl);
-
-    // Try to get size from existing DOM elements
-    var sizeText = null;
-    var cells = rowEl.querySelectorAll("td, .size, .file-size, [data-size]");
-    for (var i = 0; i < cells.length; i++) {
-      var cell = cells[i];
-      var txt = (cell.textContent || "").trim();
-      if (/^\d+(\.\d+)?\s*(B|KB|MB|GB|TB)$/i.test(txt)) {
-        sizeText = txt;
-        break;
-      }
-      if (cell.getAttribute("data-size")) {
-        var bytes = parseInt(cell.getAttribute("data-size"), 10);
-        if (bytes > 0) sizeText = formatBytes(bytes);
-        break;
-      }
-    }
-
-    // Create badge
-    var badge = document.createElement("span");
-    badge.className = SIZE_BADGE_CLASS + (isFolder ? " folder" : "");
-
-    if (isFolder) {
-      // Check cache first
-      if (path && folderSizeCache[path] !== undefined) {
-        var cached = folderSizeCache[path];
-        badge.textContent = cached ? (cached.toLocaleString() + " bytes") : "Empty";
-      } else if (path) {
-        // Auto-fetch folder size
-        badge.classList.add("loading");
-        badge.textContent = "...";
-        badge.title = "Calculating folder size";
-        if (!folderSizeInFlight[path]) {
-          folderSizeInFlight[path] = true;
-          fetchFolderSize(path)
-            .then(function (size) {
-              folderSizeCache[path] = size;
-              badge.classList.remove("loading");
-              badge.textContent = size ? (size.toLocaleString() + " bytes") : "Empty";
-              badge.title = size ? formatBytes(size) : "Empty folder";
-              delete folderSizeInFlight[path];
-            })
-            .catch(function () {
-              badge.classList.remove("loading");
-              badge.textContent = "—";
-              badge.title = "Could not calculate size";
-              delete folderSizeInFlight[path];
-            });
-        }
-      } else {
-        badge.textContent = "—";
-      }
-    } else if (sizeText) {
-      badge.textContent = sizeText;
-    } else {
-      // No size available, skip
-      return;
-    }
-
-    // Insert badge after name
-    try {
-      nameEl.insertAdjacentElement("afterend", badge);
-    } catch (e) {
-      // Fallback
-      if (nameEl.parentNode) {
-        nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
-      }
-    }
-  }
-
-  function hydrateFileSizes() {
-    if (!isFilesPage()) return;
-
-    var root = document.getElementById("listing") || document.getElementById("app") || document.body;
-    var rows = root.querySelectorAll(".item, .file, tr, .v-list-item, .row.list-item");
-
-    for (var i = 0; i < rows.length && i < 300; i++) {
-      var row = rows[i];
-      if (!row || row.classList.contains("header")) continue;
-
-      // Find name element
-      var nameEl =
-        row.querySelector(".name") ||
-        row.querySelector(".v-list-item__title") ||
-        row.querySelector(".filename") ||
-        row.querySelector(".file-name") ||
-        row.querySelector("a[href*='/files/']");
-
-      if (!nameEl) continue;
-
-      addSizeBadgeToRow(row, nameEl);
-    }
+    document.body.appendChild(a);
   }
 
   // ============ STREAM GALLERY BUTTON ============
@@ -2097,9 +1669,348 @@
     document.head.appendChild(style);
   }
 
+  function ensureDropprSettingsStyles() {
+    if (document.getElementById(DROPPR_SETTINGS_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = DROPPR_SETTINGS_STYLE_ID;
+    style.textContent =
+      "#" + DROPPR_SETTINGS_CARD_ID + " {\n" +
+      "  margin: 12px 0 16px;\n" +
+      "  padding: 14px;\n" +
+      "  border-radius: 14px;\n" +
+      "  border: 1px solid rgba(255,255,255,0.12);\n" +
+      "  background: rgba(30,41,59,0.55);\n" +
+      "  box-shadow: 0 16px 38px -28px rgba(0,0,0,0.55);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  color: rgba(241,245,249,0.98);\n" +
+      "}\n" +
+      ":root.dark #" + DROPPR_SETTINGS_CARD_ID + " {\n" +
+      "  border-color: rgba(255,255,255,0.12);\n" +
+      "}\n" +
+      ":root:not(.dark) #" + DROPPR_SETTINGS_CARD_ID + " {\n" +
+      "  background: rgba(255,255,255,0.9);\n" +
+      "  border-color: rgba(0,0,0,0.12);\n" +
+      "  color: rgba(15,23,42,0.98);\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .hdr {\n" +
+      "  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .title {\n" +
+      "  font-weight: 900;\n" +
+      "  letter-spacing: -0.01em;\n" +
+      "  font-size: 14px;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .sub {\n" +
+      "  margin-top: 6px;\n" +
+      "  font-size: 12px;\n" +
+      "  opacity: 0.8;\n" +
+      "  line-height: 1.35;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .grid {\n" +
+      "  margin-top: 12px;\n" +
+      "  display: grid;\n" +
+      "  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n" +
+      "  gap: 10px;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " label {\n" +
+      "  display:block;\n" +
+      "  font-size: 11px;\n" +
+      "  font-weight: 900;\n" +
+      "  letter-spacing: 0.03em;\n" +
+      "  text-transform: uppercase;\n" +
+      "  opacity: 0.8;\n" +
+      "  margin-bottom: 6px;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " input {\n" +
+      "  width: 100%;\n" +
+      "  border-radius: 12px;\n" +
+      "  padding: 10px 12px;\n" +
+      "  font-size: 13px;\n" +
+      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  background: rgba(2,6,23,0.22);\n" +
+      "  color: inherit;\n" +
+      "  outline: none;\n" +
+      "}\n" +
+      ":root:not(.dark) #" + DROPPR_SETTINGS_CARD_ID + " input {\n" +
+      "  border-color: rgba(0,0,0,0.12);\n" +
+      "  background: rgba(2,6,23,0.04);\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .actions {\n" +
+      "  margin-top: 12px;\n" +
+      "  display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .btn {\n" +
+      "  appearance:none;\n" +
+      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  background: rgba(255,255,255,0.08);\n" +
+      "  color: inherit;\n" +
+      "  padding: 9px 11px;\n" +
+      "  border-radius: 999px;\n" +
+      "  cursor: pointer;\n" +
+      "  font-weight: 900;\n" +
+      "  font-size: 12px;\n" +
+      "}\n" +
+      ":root:not(.dark) #" + DROPPR_SETTINGS_CARD_ID + " .btn {\n" +
+      "  border-color: rgba(0,0,0,0.12);\n" +
+      "  background: rgba(2,6,23,0.04);\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .btn.primary {\n" +
+      "  background: rgba(99, 102, 241, 0.92);\n" +
+      "  border-color: rgba(255,255,255,0.14);\n" +
+      "  color: #070b16;\n" +
+      "}\n" +
+      "#" + DROPPR_SETTINGS_CARD_ID + " .msg {\n" +
+      "  margin-top: 10px;\n" +
+      "  font-size: 12px;\n" +
+      "  line-height: 1.35;\n" +
+      "  opacity: 0.92;\n" +
+      "}\n";
+    document.head.appendChild(style);
+  }
+
+  function ensureDropprSessionSettingsCard() {
+    var existing = document.getElementById(DROPPR_SETTINGS_CARD_ID);
+    if (!isLoggedIn() || !isSettingsPage() || isSharesPage()) {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return;
+    }
+
+    var token = getAuthToken();
+    var storedIsAdmin = null;
+    try {
+      storedIsAdmin = localStorage.getItem(SESSION_IS_ADMIN_KEY);
+    } catch (e) {
+      storedIsAdmin = null;
+    }
+
+    if (storedIsAdmin === "0") {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return;
+    }
+
+    if (storedIsAdmin !== "1") {
+      var now = nowMs();
+      if (token && !sessionSettingsAdminCheckInFlight && now - sessionSettingsAdminCheckedAt > 30000) {
+        sessionSettingsAdminCheckInFlight = true;
+        sessionSettingsAdminCheckedAt = now;
+        detectIsAdmin(token)
+          .then(function (v) {
+            try {
+              localStorage.setItem(SESSION_IS_ADMIN_KEY, v ? "1" : "0");
+            } catch (e2) {}
+          })
+          .catch(function () {})
+          .finally(function () {
+            sessionSettingsAdminCheckInFlight = false;
+            ensureDropprSessionSettingsCard();
+          });
+      }
+
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return;
+    }
+
+    if (existing) return;
+
+    ensureDropprSettingsStyles();
+
+    var host = null;
+    try {
+      host =
+        document.querySelector(".v-main__wrap") ||
+        document.querySelector("main") ||
+        document.querySelector("#app") ||
+        null;
+
+      if (host && host.querySelector) {
+        host =
+          host.querySelector(".container") ||
+          host.querySelector(".v-content__wrap") ||
+          host;
+      }
+    } catch (e) {
+      host = null;
+    }
+
+    if (!host || !host.insertBefore) return;
+
+    var card = document.createElement("div");
+    card.id = DROPPR_SETTINGS_CARD_ID;
+
+    card.innerHTML =
+      '<div class="hdr">' +
+      '  <div style="min-width:0">' +
+      '    <div class="title">Droppr Session Settings</div>' +
+      '    <div class="sub">Controls automatic logout in the browser (client-side). Set 0 to disable a timer.</div>' +
+      "  </div>" +
+      "</div>" +
+      '<div class="grid">' +
+      '  <div><label>Admin idle (minutes)</label><input id="droppr-sess-admin-idle" type="number" min="0" step="1" /></div>' +
+      '  <div><label>Admin max (minutes)</label><input id="droppr-sess-admin-max" type="number" min="0" step="1" /></div>' +
+      '  <div><label>User idle (minutes)</label><input id="droppr-sess-user-idle" type="number" min="0" step="1" /></div>' +
+      '  <div><label>User max (minutes)</label><input id="droppr-sess-user-max" type="number" min="0" step="1" /></div>' +
+      '  <div><label>Warning (seconds)</label><input id="droppr-sess-warn-sec" type="number" min="0" step="1" /></div>' +
+      "</div>" +
+      '<div class="actions">' +
+      '  <button class="btn primary" type="button" id="droppr-sess-save">Save</button>' +
+      '  <button class="btn" type="button" id="droppr-sess-reset">Reset defaults</button>' +
+      "</div>" +
+      '<div class="msg" id="droppr-sess-msg"></div>';
+
+    host.insertBefore(card, host.firstChild || null);
+
+    function getEl(id) {
+      try {
+        return document.getElementById(id);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    var msgEl = getEl("droppr-sess-msg");
+    function setMsg(text, isError) {
+      if (!msgEl) return;
+      msgEl.textContent = text || "";
+      msgEl.style.color = isError ? "rgba(239,68,68,0.95)" : "";
+      msgEl.style.display = text ? "block" : "none";
+    }
+
+    function readInt(id) {
+      var el = getEl(id);
+      var v = el ? parseIntOrNull(el.value) : null;
+      if (v == null || v < 0) v = 0;
+      return v;
+    }
+
+    function api(path, options) {
+      if (!token) return Promise.reject(new Error("Not logged in"));
+      var opts = options || {};
+      var headers = opts.headers || {};
+      headers["X-Auth"] = token;
+      opts.headers = headers;
+      return fetch(path, opts).then(function (res) {
+        return res.text().then(function (text) {
+          var data = null;
+          try {
+            data = JSON.parse(text || "{}");
+          } catch (e) {
+            data = null;
+          }
+          if (!res.ok) {
+            var msg = (data && data.error) ? String(data.error) : (text || ("HTTP " + res.status));
+            throw new Error(msg);
+          }
+          return data || {};
+        });
+      });
+    }
+
+    function fillFrom(data) {
+      var s = data && data.session ? data.session : null;
+      if (!s) return;
+      var aIdle = getEl("droppr-sess-admin-idle");
+      var aMax = getEl("droppr-sess-admin-max");
+      var uIdle = getEl("droppr-sess-user-idle");
+      var uMax = getEl("droppr-sess-user-max");
+      var warn = getEl("droppr-sess-warn-sec");
+      if (aIdle) aIdle.value = String(Number(s.admin_idle_minutes || 0));
+      if (aMax) aMax.value = String(Number(s.admin_max_minutes || 0));
+      if (uIdle) uIdle.value = String(Number(s.user_idle_minutes || 0));
+      if (uMax) uMax.value = String(Number(s.user_max_minutes || 0));
+      if (warn) warn.value = String(Number(s.warning_seconds || 0));
+    }
+
+    function load() {
+      setMsg("Loading…", false);
+      return api("/api/droppr/session-settings", { method: "GET" })
+        .then(function (data) {
+          fillFrom(data);
+          setMsg("Loaded. Save to apply.", false);
+          setTimeout(function () { setMsg("", false); }, 1200);
+        })
+        .catch(function (err) {
+          setMsg(String(err && err.message ? err.message : err), true);
+        });
+    }
+
+    function save() {
+      var btn = getEl("droppr-sess-save");
+      if (btn) btn.disabled = true;
+      setMsg("Saving…", false);
+      return api("/api/droppr/session-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_idle_minutes: readInt("droppr-sess-admin-idle"),
+          admin_max_minutes: readInt("droppr-sess-admin-max"),
+          user_idle_minutes: readInt("droppr-sess-user-idle"),
+          user_max_minutes: readInt("droppr-sess-user-max"),
+          warning_seconds: readInt("droppr-sess-warn-sec"),
+        }),
+      })
+        .then(function (data) {
+          fillFrom(data);
+          setMsg("Saved.", false);
+          setTimeout(function () { setMsg("", false); }, 1200);
+        })
+        .catch(function (err) {
+          setMsg(String(err && err.message ? err.message : err), true);
+        })
+        .then(function () {
+          if (btn) btn.disabled = false;
+        });
+    }
+
+    function reset() {
+      var btn = getEl("droppr-sess-reset");
+      if (btn) btn.disabled = true;
+      setMsg("", false);
+      var ok = false;
+      try {
+        ok = !!window.confirm("Reset session settings to defaults?");
+      } catch (e) {
+        ok = false;
+      }
+      if (!ok) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      setMsg("Resetting…", false);
+      return api("/api/droppr/session-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reset: true }),
+      })
+        .then(function (data) {
+          fillFrom(data);
+          setMsg("Reset to defaults.", false);
+          setTimeout(function () { setMsg("", false); }, 1200);
+        })
+        .catch(function (err) {
+          setMsg(String(err && err.message ? err.message : err), true);
+        })
+        .then(function () {
+          if (btn) btn.disabled = false;
+        });
+    }
+
+    var saveBtn = getEl("droppr-sess-save");
+    if (saveBtn) saveBtn.addEventListener("click", function () { save(); });
+    var resetBtn = getEl("droppr-sess-reset");
+    if (resetBtn) resetBtn.addEventListener("click", function () { reset(); });
+
+    load();
+  }
+
   function isSharesPage() {
     var p = String((window.location && window.location.pathname) || "");
     return p.indexOf("/settings/shares") !== -1;
+  }
+
+  function isSettingsPage() {
+    var p = String((window.location && window.location.pathname) || "");
+    return p === "/settings" || p.indexOf("/settings/") === 0;
   }
 
   function extractShareHashFromHref(href) {
@@ -2121,48 +2032,6 @@
     var n = parseIntOrNull(stored);
     if (n == null || n < 0) return 30;
     return n;
-  }
-
-  // Upload timeout settings (in seconds, default 30 min for file validation)
-  function getUploadTimeoutSeconds() {
-    var stored = null;
-    try {
-      stored = localStorage.getItem(UPLOAD_TIMEOUT_STORAGE_KEY);
-    } catch (e) {
-      stored = null;
-    }
-    var n = parseIntOrNull(stored);
-    if (n == null || n < 5) return 1800; // Default 30 minutes (max)
-    return Math.min(n, 1800); // Max 30 minutes
-  }
-
-  function setUploadTimeoutSeconds(seconds) {
-    try {
-      localStorage.setItem(UPLOAD_TIMEOUT_STORAGE_KEY, String(seconds));
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  // Max wait timeout settings (in minutes, default 8 hours for large uploads/iCloud)
-  function getMaxWaitMinutes() {
-    var stored = null;
-    try {
-      stored = localStorage.getItem(MAX_WAIT_TIMEOUT_STORAGE_KEY);
-    } catch (e) {
-      stored = null;
-    }
-    var n = parseIntOrNull(stored);
-    if (n == null || n < 1) return 480; // Default 8 hours (max)
-    return Math.min(n, 480); // Max 8 hours
-  }
-
-  function setMaxWaitMinutes(minutes) {
-    try {
-      localStorage.setItem(MAX_WAIT_TIMEOUT_STORAGE_KEY, String(minutes));
-    } catch (e) {
-      // ignore
-    }
   }
 
   function updateShareExpire(shareHash, hours, sharePath) {
@@ -2665,6 +2534,201 @@
     }
   }
 
+  function ensureQuickShareStyles() {
+    if (document.getElementById(QUICK_SHARE_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = QUICK_SHARE_STYLE_ID;
+    style.textContent =
+      "." + QUICK_SHARE_BTN_CLASS + " { margin-left: 6px; }\n" +
+      "." + QUICK_SHARE_BTN_CLASS + "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
+    document.head.appendChild(style);
+  }
+
+  function ensureFilesQuickShareButton() {
+    if (!isLoggedIn()) return;
+    if (!isFilesPage()) return;
+
+    ensureQuickShareStyles();
+
+    function isInDialogOrMenu(el) {
+      try {
+        return !!(
+          el &&
+          el.closest &&
+          (el.closest(".v-dialog__content--active") ||
+            el.closest(".v-dialog--active") ||
+            el.closest(".v-menu__content") ||
+            el.closest("[role=\"dialog\"]"))
+        );
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function isVisible(el) {
+      if (!el) return false;
+      try {
+        if (el.offsetParent) return true;
+        var rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        return !!(rect && rect.width > 0 && rect.height > 0);
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function attachToShareButton(shareBtn) {
+      if (!shareBtn) return false;
+      if (shareBtn.classList && shareBtn.classList.contains(QUICK_SHARE_BTN_CLASS)) return false;
+      if (isInDialogOrMenu(shareBtn)) return false;
+      if (!isVisible(shareBtn)) return false;
+
+      var host = shareBtn.parentNode;
+      if (!host || !host.insertBefore) return false;
+
+      var disabled =
+        !!shareBtn.disabled ||
+        shareBtn.getAttribute("disabled") != null ||
+        shareBtn.getAttribute("aria-disabled") === "true" ||
+        (shareBtn.classList && shareBtn.classList.contains("v-btn--disabled"));
+
+      var existing = host.querySelector ? host.querySelector("." + QUICK_SHARE_BTN_CLASS) : null;
+      if (existing) {
+        existing.disabled = disabled;
+        try {
+          if (existing.classList) {
+            if (disabled) existing.classList.add("v-btn--disabled");
+            else existing.classList.remove("v-btn--disabled");
+          }
+        } catch (e3) {
+          // ignore
+        }
+
+        try {
+          existing.style.display = shareBtn.style && shareBtn.style.display === "none" ? "none" : "";
+        } catch (e4) {
+          // ignore
+        }
+        return true;
+      }
+
+      var newBtn = shareBtn.cloneNode(true);
+      if (newBtn.classList && newBtn.classList.add) newBtn.classList.add(QUICK_SHARE_BTN_CLASS);
+      newBtn.title = "Quick Share (Direct Link)";
+      newBtn.setAttribute("aria-label", "Quick Share (Direct Link)");
+      setMaterialIconText(newBtn, "link");
+      newBtn.disabled = disabled;
+
+      newBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var rowEl = getSelectedFilesRowEl();
+        var decodedPath = extractSelectedPathFromFilesRow(rowEl);
+        if (!decodedPath) {
+          showAutoShareModal({
+            title: "Select a file or folder",
+            subtitle: "",
+            url: "",
+            note: "Select a file/folder in the list first, then click Quick Share again.",
+            autoCopy: false,
+          });
+          return;
+        }
+
+        var apiPath = encodePathSegmentsForApi(decodedPath);
+        var label = String(decodedPath).split("/").pop() || decodedPath;
+        var isFolder = !label.includes(".") || label.endsWith("/");
+
+        newBtn.disabled = true;
+        createShare(apiPath)
+          .then(function (resp) {
+            var hash = resp && resp.hash ? resp.hash : "";
+            if (!hash) throw new Error("Share response missing hash");
+
+            var directUrl = window.location.origin + "/api/public/dl/" + hash;
+            var zipUrl = window.location.origin + "/api/share/" + hash + "/download";
+
+            if (isFolder) {
+              showAutoShareModal({
+                title: "Direct share link ready",
+                subtitle: label ? ("Folder: " + label) : "",
+                urlLabel: "Direct link (opens folder view):",
+                url: directUrl,
+                openUrl: directUrl,
+                streamLabel: "Download as ZIP:",
+                streamUrl: zipUrl,
+                note: "Recipients can access without logging in.",
+                autoCopy: true,
+                autoCopyValue: directUrl,
+              });
+            } else {
+              showAutoShareModal({
+                title: "Direct download link ready",
+                subtitle: label ? ("File: " + label) : "",
+                urlLabel: "Direct download link:",
+                url: directUrl,
+                openUrl: directUrl,
+                note: "Recipients can download without logging in.",
+                autoCopy: true,
+                autoCopyValue: directUrl,
+              });
+            }
+          })
+          .catch(function (err) {
+            showAutoShareModal({
+              title: "Could not create share link",
+              subtitle: label ? ("Selected: " + label) : "",
+              url: "",
+              note: String(err && err.message ? err.message : err),
+              autoCopy: false,
+            });
+          })
+          .then(function () {
+            newBtn.disabled = false;
+          });
+      });
+
+      host.insertBefore(newBtn, shareBtn.nextSibling);
+      return true;
+    }
+
+    var iconNodes = document.querySelectorAll
+      ? document.querySelectorAll("i.material-icons, span.material-icons, .material-icons")
+      : [];
+    for (var i = 0; i < iconNodes.length; i++) {
+      var icon = iconNodes[i];
+      if (!icon) continue;
+      var txt = String(icon.textContent || "").trim();
+      if (txt !== "share") continue;
+
+      var shareBtn = null;
+      try {
+        shareBtn = icon.closest ? icon.closest("button, a") : null;
+      } catch (e) {
+        shareBtn = null;
+      }
+      if (attachToShareButton(shareBtn)) return;
+    }
+
+    var candidates = document.querySelectorAll
+      ? document.querySelectorAll("button, a[href]")
+      : [];
+    for (var j = 0; j < candidates.length; j++) {
+      var el = candidates[j];
+      if (!el) continue;
+      if (isInDialogOrMenu(el)) continue;
+      if (!isVisible(el)) continue;
+
+      var label = (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("title"))) || "";
+      var labelLower = String(label || "").toLowerCase();
+      var textLower = String(el.textContent || "").trim().toLowerCase();
+
+      if (labelLower.indexOf("share") === -1 && textLower !== "share") continue;
+
+      if (attachToShareButton(el)) return;
+    }
+  }
+
   function ensureAutoShareStyles() {
     if (document.getElementById(AUTO_SHARE_STYLE_ID)) return;
 
@@ -2908,6 +2972,7 @@
   function showAutoShareModal(opts) {
     ensureAutoShareStyles();
     dismissAutoShareModal();
+    opts = opts || {};
 
     var modal = document.createElement("div");
     modal.id = AUTO_SHARE_MODAL_ID;
@@ -2949,62 +3014,70 @@
       body.appendChild(urlLabel);
     }
 
-    var row = document.createElement("div");
-    row.className = "row";
+    var primaryUrl = String(opts.url || "").trim();
+    var openTarget = String(opts.openUrl || "").trim() || primaryUrl;
+    var hasPrimaryUrl = primaryUrl.length > 0;
+    var input = null;
+    var copyBtn = null;
 
-    var input = document.createElement("input");
-    input.type = "text";
-    input.readOnly = true;
-    input.value = opts.url || "";
-    input.addEventListener("focus", function () {
-      try {
-        input.select();
-      } catch (e) {
-        // ignore
-      }
-    });
+    if (hasPrimaryUrl) {
+      var row = document.createElement("div");
+      row.className = "row";
 
-    var copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "btn";
-    copyBtn.textContent = "Copy";
-    copyBtn.addEventListener("click", function () {
+      input = document.createElement("input");
+      input.type = "text";
+      input.readOnly = true;
+      input.value = primaryUrl;
+      input.addEventListener("focus", function () {
+        try {
+          input.select();
+        } catch (e) {
+          // ignore
+        }
+      });
+
+      copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "btn";
       copyBtn.textContent = "Copy";
-      copyText(input.value)
-        .then(function () {
-          copyBtn.textContent = "Copied";
-          setTimeout(function () {
-            if (document.body.contains(copyBtn)) copyBtn.textContent = "Copy";
-          }, 1200);
-        })
-        .catch(function () {
-          copyBtn.textContent = "Copy";
-          try {
-            input.focus();
-            input.select();
-          } catch (e) {
-            // ignore
-          }
-        });
-    });
+      copyBtn.addEventListener("click", function () {
+        copyBtn.textContent = "Copy";
+        copyText(input.value)
+          .then(function () {
+            copyBtn.textContent = "Copied";
+            setTimeout(function () {
+              if (document.body.contains(copyBtn)) copyBtn.textContent = "Copy";
+            }, 1200);
+          })
+          .catch(function () {
+            copyBtn.textContent = "Copy";
+            try {
+              input.focus();
+              input.select();
+            } catch (e) {
+              // ignore
+            }
+          });
+      });
 
-    var openBtn = document.createElement("button");
-    openBtn.type = "button";
-    openBtn.className = "btn secondary";
-    openBtn.textContent = "Open";
-    openBtn.addEventListener("click", function () {
-      try {
-        window.open(opts.openUrl || opts.url, "_blank", "noopener");
-      } catch (e) {
-        window.location.href = opts.openUrl || opts.url;
-      }
-    });
+      var openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "btn secondary";
+      openBtn.textContent = "Open";
+      openBtn.addEventListener("click", function () {
+        if (!openTarget) return;
+        try {
+          window.open(openTarget, "_blank", "noopener");
+        } catch (e) {
+          window.location.href = openTarget;
+        }
+      });
 
-    row.appendChild(input);
-    row.appendChild(copyBtn);
-    row.appendChild(openBtn);
-
-    body.appendChild(row);
+      row.appendChild(input);
+      row.appendChild(copyBtn);
+      row.appendChild(openBtn);
+      body.appendChild(row);
+    }
 
     // Stream Gallery row (for video-optimized player)
     if (opts.streamUrl) {
@@ -3068,15 +3141,17 @@
     modal.appendChild(body);
     document.body.appendChild(modal);
 
-    try {
-      input.focus();
-      input.select();
-    } catch (e) {
-      // ignore
+    if (input) {
+      try {
+        input.focus();
+        input.select();
+      } catch (e) {
+        // ignore
+      }
     }
 
-    if (opts.autoCopy && opts.url) {
-      var valueToCopy = opts.autoCopyValue || opts.url;
+    if (opts.autoCopy && hasPrimaryUrl && copyBtn) {
+      var valueToCopy = opts.autoCopyValue || primaryUrl;
       copyText(valueToCopy)
         .then(function () {
           copyBtn.textContent = "Copied";
@@ -3828,7 +3903,7 @@
   function validateFileReadable(file, opts) {
     var options = opts || {};
     var timeoutMs = parseIntOrNull(options.timeoutMs);
-    if (timeoutMs == null) timeoutMs = getUploadTimeoutSeconds() * 1000;
+    if (timeoutMs == null) timeoutMs = 15000;
 
     return new Promise(function (resolve) {
       if (!file) {
@@ -3944,7 +4019,7 @@
     var token = options.token || { canceled: false };
     var onStatus = options.onStatus || function () {};
     var maxWaitMs = parseIntOrNull(options.maxWaitMs);
-    if (maxWaitMs == null) maxWaitMs = getMaxWaitMinutes() * 60 * 1000;
+    if (maxWaitMs == null) maxWaitMs = 20 * 60 * 1000;
 
     var start = nowMs();
 
@@ -3964,7 +4039,7 @@
         var status = "Preparing " + (index + 1) + "/" + total + ": " + name + " (" + elapsedSec() + "s)";
         onStatus(status);
 
-        return validateFileReadable(file, { timeoutMs: getUploadTimeoutSeconds() * 1000 }).then(function (ok) {
+        return validateFileReadable(file, { timeoutMs: 15000 }).then(function (ok) {
           if (ok) return true;
           if (token.canceled) return false;
           if (nowMs() - start > maxWaitMs) return false;
@@ -4049,7 +4124,7 @@
         });
       }, 350);
 
-      waitForFilesReadable(files, { token: gate, onStatus: setStatus, maxWaitMs: getMaxWaitMinutes() * 60 * 1000 })
+      waitForFilesReadable(files, { token: gate, onStatus: setStatus, maxWaitMs: 20 * 60 * 1000 })
         .then(function (ok) {
           if (fileInputGate !== gate) return;
           cleanupOverlay();
@@ -4074,34 +4149,1906 @@
     }, true);
   }
 
+  // ============ UPLOAD REQUEST FUNCTIONALITY ============
+
+  function ensureUploadRequestStyles() {
+    if (document.getElementById(UPLOAD_REQUEST_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = UPLOAD_REQUEST_STYLE_ID;
+    style.textContent =
+      "#" + UPLOAD_REQUEST_FAB_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  right: 20px;\n" +
+      "  bottom: 20px;\n" +
+      "  z-index: 2147483000;\n" +
+      "  display: inline-flex;\n" +
+      "  align-items: center;\n" +
+      "  gap: 12px;\n" +
+      "  padding: 18px 24px;\n" +
+      "  border-radius: 16px;\n" +
+      "  border: 1px solid rgba(255,255,255,0.24);\n" +
+      "  background: rgba(14, 165, 233, 0.98);\n" +
+      "  color: #ffffff;\n" +
+      "  box-shadow: 0 22px 50px -22px rgba(2,132,199,0.9), 0 14px 28px -18px rgba(0,0,0,0.75);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  font-size: 18px;\n" +
+      "  font-weight: 900;\n" +
+      "  letter-spacing: -0.01em;\n" +
+      "  line-height: 1;\n" +
+      "  cursor: pointer;\n" +
+      "  user-select: none;\n" +
+      "  -webkit-tap-highlight-color: transparent;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_FAB_ID + ":hover {\n" +
+      "  background: rgba(2, 132, 199, 0.99);\n" +
+      "  transform: translateY(-1px);\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_FAB_ID + ":focus-visible {\n" +
+      "  outline: 2px solid rgba(125, 211, 252, 0.95);\n" +
+      "  outline-offset: 2px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_FAB_ID + " .material-icons {\n" +
+      "  font-size: 26px;\n" +
+      "  line-height: 1;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_FAB_ID + " .label {\n" +
+      "  white-space: nowrap;\n" +
+      "}\n" +
+      "@media (max-width: 680px) {\n" +
+      "  #" + UPLOAD_REQUEST_FAB_ID + " {\n" +
+      "    right: 10px;\n" +
+      "    bottom: 10px;\n" +
+      "    gap: 9px;\n" +
+      "    padding: 14px 16px;\n" +
+      "    font-size: 15px;\n" +
+      "  }\n" +
+      "  #" + UPLOAD_REQUEST_FAB_ID + " .label {\n" +
+      "    max-width: 52vw;\n" +
+      "    overflow: hidden;\n" +
+      "    text-overflow: ellipsis;\n" +
+      "  }\n" +
+      "}\n" +
+      "." + UPLOAD_REQUEST_BTN_CLASS + " {\n" +
+      "  margin-left: 6px;\n" +
+      "  background: #0ea5e9 !important;\n" +
+      "}\n" +
+      "." + UPLOAD_REQUEST_BTN_CLASS + ":hover {\n" +
+      "  background: #0284c7 !important;\n" +
+      "}\n" +
+      "." + UPLOAD_REQUEST_BTN_CLASS + "[disabled] {\n" +
+      "  opacity: 0.55;\n" +
+      "  cursor: not-allowed;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  right: 18px;\n" +
+      "  bottom: 74px;\n" +
+      "  z-index: 2147483001;\n" +
+      "  width: 520px;\n" +
+      "  max-width: calc(100vw - 36px);\n" +
+      "  border-radius: 14px;\n" +
+      "  background: var(--droppr-overlay-bg, rgba(17, 24, 39, 0.98));\n" +
+      "  color: var(--text-primary, #e5e7eb);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.12));\n" +
+      "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  overflow: hidden;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .hdr {\n" +
+      "  display: flex;\n" +
+      "  align-items: flex-start;\n" +
+      "  justify-content: space-between;\n" +
+      "  gap: 12px;\n" +
+      "  padding: 14px 14px 8px 14px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .title {\n" +
+      "  font-size: 14px;\n" +
+      "  font-weight: 800;\n" +
+      "  line-height: 1.2;\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .subtitle {\n" +
+      "  font-size: 12px;\n" +
+      "  line-height: 1.2;\n" +
+      "  margin-top: 4px;\n" +
+      "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
+      "  word-break: break-word;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .close {\n" +
+      "  appearance: none;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.2));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  width: 28px;\n" +
+      "  height: 28px;\n" +
+      "  border-radius: 10px;\n" +
+      "  cursor: pointer;\n" +
+      "  font-weight: 800;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .body {\n" +
+      "  padding: 0 14px 14px 14px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field {\n" +
+      "  margin-bottom: 12px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field label {\n" +
+      "  display: block;\n" +
+      "  font-size: 12px;\n" +
+      "  color: var(--text-muted, #888);\n" +
+      "  margin-bottom: 4px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field input[type='text'],\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field input[type='password'],\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field input[type='number'] {\n" +
+      "  width: 100%;\n" +
+      "  box-sizing: border-box;\n" +
+      "  padding: 8px 10px;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.15));\n" +
+      "  border-radius: 8px;\n" +
+      "  background: var(--input-bg, rgba(255,255,255,0.06));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  font-size: 13px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .grid {\n" +
+      "  display: grid;\n" +
+      "  grid-template-columns: 1fr 1fr;\n" +
+      "  gap: 10px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field.checkbox {\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  gap: 8px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .field.checkbox input {\n" +
+      "  width: 16px;\n" +
+      "  height: 16px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .actions {\n" +
+      "  display: flex;\n" +
+      "  gap: 10px;\n" +
+      "  margin-top: 12px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .btn {\n" +
+      "  appearance: none;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.15));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  padding: 9px 11px;\n" +
+      "  border-radius: 10px;\n" +
+      "  cursor: pointer;\n" +
+      "  font-weight: 800;\n" +
+      "  font-size: 12px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .btn.primary {\n" +
+      "  background: #0ea5e9;\n" +
+      "  border-color: rgba(255,255,255,0.0);\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .btn.primary:hover {\n" +
+      "  background: #0284c7;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .btn.primary:disabled {\n" +
+      "  opacity: 0.55;\n" +
+      "  cursor: not-allowed;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .btn.secondary {\n" +
+      "  background: transparent;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .note {\n" +
+      "  font-size: 12px;\n" +
+      "  margin-top: 10px;\n" +
+      "  color: var(--text-secondary, rgba(229,231,235,0.7));\n" +
+      "  line-height: 1.35;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .result {\n" +
+      "  margin-top: 12px;\n" +
+      "  padding-top: 12px;\n" +
+      "  border-top: 1px solid var(--droppr-overlay-border-soft, rgba(255,255,255,0.08));\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .result .url-row {\n" +
+      "  display: flex;\n" +
+      "  gap: 8px;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .result input {\n" +
+      "  flex: 1 1 auto;\n" +
+      "  min-width: 0;\n" +
+      "}\n" +
+      "#" + UPLOAD_REQUEST_MODAL_ID + " .error {\n" +
+      "  margin-top: 10px;\n" +
+      "  padding: 10px;\n" +
+      "  border-radius: 10px;\n" +
+      "  background: rgba(239, 68, 68, 0.12);\n" +
+      "  border: 1px solid rgba(239, 68, 68, 0.22);\n" +
+      "  color: rgba(254, 202, 202, 0.95);\n" +
+      "  font-size: 12px;\n" +
+      "  line-height: 1.35;\n" +
+      "}\n" +
+      "@media (max-width: 520px) {\n" +
+      "  #" + UPLOAD_REQUEST_MODAL_ID + " .grid { grid-template-columns: 1fr; }\n" +
+      "}\n";
+    document.head.appendChild(style);
+  }
+
+  function dismissUploadRequestModal() {
+    var existing = document.getElementById(UPLOAD_REQUEST_MODAL_ID);
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function getDefaultUploadRequestExpireHours() {
+    var stored = null;
+    try {
+      stored = localStorage.getItem(UPLOAD_REQUEST_EXPIRE_STORAGE_KEY);
+    } catch (e) {
+      stored = null;
+    }
+    var n = parseIntOrNull(stored);
+    if (n == null || n < 0) return 168;
+    return n;
+  }
+
+  function showUploadRequestCreationModal(path) {
+    ensureUploadRequestStyles();
+    dismissUploadRequestModal();
+
+    var modal = document.createElement("div");
+    modal.id = UPLOAD_REQUEST_MODAL_ID;
+
+    var header = document.createElement("div");
+    header.className = "hdr";
+
+    var headerText = document.createElement("div");
+    var title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "Create File Request";
+
+    var subtitle = document.createElement("div");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "Recipients can upload to this folder (no account required)";
+
+    headerText.appendChild(title);
+    headerText.appendChild(subtitle);
+
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "close";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", dismissUploadRequestModal);
+
+    header.appendChild(headerText);
+    header.appendChild(closeBtn);
+
+    var body = document.createElement("div");
+    body.className = "body";
+
+    // Path field (readonly)
+    var pathField = document.createElement("div");
+    pathField.className = "field";
+    var pathLabel = document.createElement("label");
+    pathLabel.textContent = "Destination folder";
+    var pathInput = document.createElement("input");
+    pathInput.type = "text";
+    pathInput.readOnly = true;
+    pathInput.value = path;
+    pathField.appendChild(pathLabel);
+    pathField.appendChild(pathInput);
+
+    // Title field
+    var titleField = document.createElement("div");
+    titleField.className = "field";
+    var titleLabel = document.createElement("label");
+    titleLabel.textContent = "Title (optional)";
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.placeholder = "Upload files";
+    titleField.appendChild(titleLabel);
+    titleField.appendChild(titleInput);
+
+    // Expiry field
+    var expiryField = document.createElement("div");
+    expiryField.className = "field";
+    var expiryLabel = document.createElement("label");
+    expiryLabel.textContent = "Expires in (hours) — 0 = never";
+    var expiryInput = document.createElement("input");
+    expiryInput.type = "number";
+    expiryInput.min = "0";
+    expiryInput.step = "1";
+    expiryInput.value = String(getDefaultUploadRequestExpireHours());
+    expiryField.appendChild(expiryLabel);
+    expiryField.appendChild(expiryInput);
+
+    // Password checkbox + field
+    var pwCheckField = document.createElement("div");
+    pwCheckField.className = "field checkbox";
+    var pwCheckbox = document.createElement("input");
+    pwCheckbox.type = "checkbox";
+    pwCheckbox.id = "droppr-uploadreq-pw-enabled";
+    var pwCheckLabel = document.createElement("label");
+    pwCheckLabel.setAttribute("for", pwCheckbox.id);
+    pwCheckLabel.textContent = "Password protect";
+    pwCheckField.appendChild(pwCheckbox);
+    pwCheckField.appendChild(pwCheckLabel);
+
+    var pwField = document.createElement("div");
+    pwField.className = "field";
+    pwField.style.display = "none";
+    var pwLabel = document.createElement("label");
+    pwLabel.textContent = "Password";
+    var pwInput = document.createElement("input");
+    pwInput.type = "password";
+    pwInput.placeholder = "Enter password";
+    pwField.appendChild(pwLabel);
+    pwField.appendChild(pwInput);
+
+    pwCheckbox.addEventListener("change", function () {
+      pwField.style.display = pwCheckbox.checked ? "block" : "none";
+    });
+
+    // Grid fields (limits)
+    var grid = document.createElement("div");
+    grid.className = "grid";
+
+    var maxFilesField = document.createElement("div");
+    maxFilesField.className = "field";
+    var maxFilesLabel = document.createElement("label");
+    maxFilesLabel.textContent = "Max files (0 = unlimited)";
+    var maxFilesInput = document.createElement("input");
+    maxFilesInput.type = "number";
+    maxFilesInput.min = "0";
+    maxFilesInput.step = "1";
+    maxFilesInput.value = "0";
+    maxFilesField.appendChild(maxFilesLabel);
+    maxFilesField.appendChild(maxFilesInput);
+
+    var maxSizeField = document.createElement("div");
+    maxSizeField.className = "field";
+    var maxSizeLabel = document.createElement("label");
+    maxSizeLabel.textContent = "Max file size (MB)";
+    var maxSizeInput = document.createElement("input");
+    maxSizeInput.type = "number";
+    maxSizeInput.min = "0";
+    maxSizeInput.step = "1";
+    maxSizeInput.max = "204800";
+    maxSizeInput.value = "204800";
+    maxSizeField.appendChild(maxSizeLabel);
+    maxSizeField.appendChild(maxSizeInput);
+
+    grid.appendChild(maxFilesField);
+    grid.appendChild(maxSizeField);
+
+    // Allowed extensions
+    var extsField = document.createElement("div");
+    extsField.className = "field";
+    var extsLabel = document.createElement("label");
+    extsLabel.textContent = "Allowed extensions (optional, comma-separated; leave empty for all file extensions)";
+    var extsInput = document.createElement("input");
+    extsInput.type = "text";
+    extsInput.placeholder = "jpg,png,mp4,mov";
+    extsField.appendChild(extsLabel);
+    extsField.appendChild(extsInput);
+
+    // Overwrite + subfolder checkboxes
+    var overwriteField = document.createElement("div");
+    overwriteField.className = "field checkbox";
+    var overwriteCheckbox = document.createElement("input");
+    overwriteCheckbox.type = "checkbox";
+    overwriteCheckbox.id = "droppr-uploadreq-overwrite";
+    var overwriteLabel = document.createElement("label");
+    overwriteLabel.setAttribute("for", overwriteCheckbox.id);
+    overwriteLabel.textContent = "Overwrite existing filenames";
+    overwriteField.appendChild(overwriteCheckbox);
+    overwriteField.appendChild(overwriteLabel);
+
+    var subfolderField = document.createElement("div");
+    subfolderField.className = "field checkbox";
+    var subfolderCheckbox = document.createElement("input");
+    subfolderCheckbox.type = "checkbox";
+    subfolderCheckbox.id = "droppr-uploadreq-subfolder";
+    subfolderCheckbox.checked = true;
+    var subfolderLabel = document.createElement("label");
+    subfolderLabel.setAttribute("for", subfolderCheckbox.id);
+    subfolderLabel.textContent = "Create a per-request subfolder (recommended)";
+    subfolderField.appendChild(subfolderCheckbox);
+    subfolderField.appendChild(subfolderLabel);
+
+    var shareBackField = document.createElement("div");
+    shareBackField.className = "field checkbox";
+    var shareBackCheckbox = document.createElement("input");
+    shareBackCheckbox.type = "checkbox";
+    shareBackCheckbox.id = "droppr-uploadreq-shareback";
+    shareBackCheckbox.checked = true;
+    var shareBackLabel = document.createElement("label");
+    shareBackLabel.setAttribute("for", shareBackCheckbox.id);
+    shareBackLabel.textContent = "Show a view link after upload (share back)";
+    shareBackField.appendChild(shareBackCheckbox);
+    shareBackField.appendChild(shareBackLabel);
+
+    subfolderCheckbox.addEventListener("change", function () {
+      var enabled = !!subfolderCheckbox.checked;
+      shareBackCheckbox.disabled = !enabled;
+      if (!enabled) shareBackCheckbox.checked = false;
+    });
+
+    // Actions
+    var actions = document.createElement("div");
+    actions.className = "actions";
+    var createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = "btn primary";
+    createBtn.textContent = "Create Link";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn secondary";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", dismissUploadRequestModal);
+    actions.appendChild(createBtn);
+    actions.appendChild(cancelBtn);
+
+    var note = document.createElement("div");
+    note.className = "note";
+    note.textContent = "Tip: disable the request after the upload is done. For large uploads, keep the browser tab open until it completes.";
+
+    var resultContainer = document.createElement("div");
+    resultContainer.className = "result";
+    resultContainer.style.display = "none";
+
+    var errorContainer = document.createElement("div");
+    errorContainer.className = "error";
+    errorContainer.style.display = "none";
+
+    body.appendChild(pathField);
+    body.appendChild(titleField);
+    body.appendChild(expiryField);
+    body.appendChild(pwCheckField);
+    body.appendChild(pwField);
+    body.appendChild(grid);
+    body.appendChild(extsField);
+    body.appendChild(overwriteField);
+    body.appendChild(subfolderField);
+    body.appendChild(shareBackField);
+    body.appendChild(actions);
+    body.appendChild(note);
+    body.appendChild(resultContainer);
+    body.appendChild(errorContainer);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    document.body.appendChild(modal);
+
+    createBtn.addEventListener("click", function () {
+      errorContainer.style.display = "none";
+      resultContainer.style.display = "none";
+
+      var expiresHours = parseIntOrNull(expiryInput.value);
+      if (expiresHours == null || expiresHours < 0) expiresHours = 0;
+      try {
+        localStorage.setItem(UPLOAD_REQUEST_EXPIRE_STORAGE_KEY, String(expiresHours));
+      } catch (e) {}
+
+      var maxFiles = parseIntOrNull(maxFilesInput.value);
+      if (maxFiles == null || maxFiles < 0) maxFiles = 0;
+
+      var maxMb = parseIntOrNull(maxSizeInput.value);
+      if (maxMb == null || maxMb < 0) maxMb = 0;
+
+      if (pwCheckbox.checked && !String(pwInput.value || "").trim()) {
+        errorContainer.textContent = "Password is enabled but empty.";
+        errorContainer.style.display = "block";
+        return;
+      }
+
+      var token = getAuthToken();
+      if (!token) {
+        errorContainer.textContent = "Not logged in.";
+        errorContainer.style.display = "block";
+        return;
+      }
+
+      createBtn.disabled = true;
+      createBtn.textContent = "Creating…";
+
+      var payload = {
+        path: path,
+        title: titleInput.value || "",
+        password: pwCheckbox.checked ? pwInput.value : "",
+        expires_hours: expiresHours,
+        max_files: maxFiles,
+        max_file_size_mb: maxMb,
+        allowed_exts: extsInput.value || "",
+        overwrite: !!overwriteCheckbox.checked,
+        create_subfolder: !!subfolderCheckbox.checked,
+        share_back: !!shareBackCheckbox.checked,
+      };
+
+      fetch("/api/upload-request/create", {
+        method: "POST",
+        headers: { "X-Auth": token, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then(function (resp) {
+          return resp.text().then(function (text) {
+            if (!resp.ok) {
+              var msg = text || "";
+              try {
+                var parsed = JSON.parse(text);
+                if (parsed && parsed.error) msg = String(parsed.error);
+              } catch (e) {}
+              throw new Error(msg || ("Failed (" + resp.status + ")"));
+            }
+            try {
+              return JSON.parse(text || "{}");
+            } catch (e2) {
+              return {};
+            }
+          });
+        })
+        .then(function (data) {
+          var rel = data && data.upload_url ? String(data.upload_url) : "";
+          if (!rel) throw new Error("Server did not return upload_url");
+          var uploadUrl = window.location.origin + rel;
+
+          var urlRow = document.createElement("div");
+          urlRow.className = "url-row";
+          var urlInput = document.createElement("input");
+          urlInput.type = "text";
+          urlInput.readOnly = true;
+          urlInput.value = uploadUrl;
+          urlInput.addEventListener("focus", function () {
+            try { urlInput.select(); } catch (e3) {}
+          });
+
+          var copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "btn primary";
+          copyBtn.textContent = "Copy";
+          copyBtn.addEventListener("click", function () {
+            copyText(uploadUrl)
+              .then(function () {
+                copyBtn.textContent = "Copied!";
+                setTimeout(function () {
+                  if (document.body.contains(copyBtn)) copyBtn.textContent = "Copy";
+                }, 1200);
+              })
+              .catch(function () {
+                try { urlInput.focus(); urlInput.select(); } catch (e4) {}
+              });
+          });
+
+          var openBtn = document.createElement("button");
+          openBtn.type = "button";
+          openBtn.className = "btn secondary";
+          openBtn.textContent = "Open";
+          openBtn.addEventListener("click", function () {
+            try { window.open(uploadUrl, "_blank", "noopener"); }
+            catch (e5) { window.location.href = uploadUrl; }
+          });
+
+          urlRow.appendChild(urlInput);
+          urlRow.appendChild(copyBtn);
+          urlRow.appendChild(openBtn);
+
+          resultContainer.innerHTML = "";
+          resultContainer.appendChild(urlRow);
+          resultContainer.style.display = "block";
+
+          copyText(uploadUrl).catch(function () {});
+        })
+        .catch(function (err) {
+          errorContainer.textContent = String(err && err.message ? err.message : err);
+          errorContainer.style.display = "block";
+        })
+        .then(function () {
+          createBtn.disabled = false;
+          createBtn.textContent = "Create Link";
+        });
+    });
+  }
+
+  function normalizeCompactText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function isElementVisible(el) {
+    if (!el) return false;
+    try {
+      if (el.offsetParent) return true;
+      var rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+      return !!(rect && rect.width > 0 && rect.height > 0);
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function findUploadRequestMenuContext() {
+    if (!document.querySelectorAll) return null;
+
+    var nodeList = document.querySelectorAll("a, button, [role='button'], .v-list-item");
+    if (!nodeList || !nodeList.length) return null;
+
+    var candidates = [];
+    for (var i = 0; i < nodeList.length; i++) {
+      var el = nodeList[i];
+      if (!el || el.id === UPLOAD_REQUEST_MENU_ID) continue;
+      if (!isElementVisible(el)) continue;
+
+      var text = normalizeCompactText(el.textContent);
+      if (!text) continue;
+      var isMenuText =
+        text.indexOf("my files") !== -1 ||
+        text.indexOf("new folder") !== -1 ||
+        text.indexOf("new file") !== -1 ||
+        text.indexOf("settings") !== -1 ||
+        text.indexOf("logout") !== -1;
+      if (!isMenuText) continue;
+
+      var rect = null;
+      try {
+        rect = el.getBoundingClientRect();
+      } catch (e2) {
+        rect = null;
+      }
+      if (!rect || rect.width < 24 || rect.height < 16) continue;
+      if (rect.left > Math.max(320, window.innerWidth * 0.45)) continue;
+
+      candidates.push({ el: el, text: text, rect: rect });
+    }
+
+    if (!candidates.length) return null;
+
+    var minLeft = candidates[0].rect.left;
+    for (var j = 1; j < candidates.length; j++) {
+      if (candidates[j].rect.left < minLeft) minLeft = candidates[j].rect.left;
+    }
+
+    var leftBand = [];
+    for (var k = 0; k < candidates.length; k++) {
+      if (candidates[k].rect.left <= minLeft + 80) leftBand.push(candidates[k]);
+    }
+    if (!leftBand.length) leftBand = candidates;
+
+    leftBand.sort(function (a, b) {
+      if (a.rect.top !== b.rect.top) return a.rect.top - b.rect.top;
+      return a.rect.left - b.rect.left;
+    });
+
+    var template = null;
+    for (var m = 0; m < leftBand.length; m++) {
+      if (leftBand[m].text.indexOf("new file") !== -1) {
+        template = leftBand[m].el;
+        break;
+      }
+    }
+    if (!template) {
+      for (var n = 0; n < leftBand.length; n++) {
+        if (leftBand[n].text.indexOf("new folder") !== -1) {
+          template = leftBand[n].el;
+          break;
+        }
+      }
+    }
+    if (!template) template = leftBand[0].el;
+    if (!template || !template.parentNode) return null;
+
+    var parent = template.parentNode;
+    var beforeEl = null;
+    for (var p = 0; p < leftBand.length; p++) {
+      if (leftBand[p].el.parentNode !== parent) continue;
+      if (leftBand[p].text.indexOf("settings") !== -1 || leftBand[p].text.indexOf("logout") !== -1) {
+        beforeEl = leftBand[p].el;
+        break;
+      }
+    }
+
+    return { parent: parent, template: template, beforeEl: beforeEl };
+  }
+
+  function setUploadRequestMenuItemContent(itemEl) {
+    if (!itemEl) return;
+
+    var icon = itemEl.querySelector
+      ? (itemEl.querySelector(".material-icons") || itemEl.querySelector("i.material-icons"))
+      : null;
+    if (icon && String(icon.textContent || "").trim() !== "file_upload") icon.textContent = "file_upload";
+
+    var labelEl = itemEl.querySelector
+      ? (itemEl.querySelector(".v-list-item__title") ||
+         itemEl.querySelector(".label") ||
+         itemEl.querySelector(".name") ||
+         itemEl.querySelector(".title") ||
+         itemEl.querySelector(".text"))
+      : null;
+    if (labelEl && labelEl !== icon) {
+      if (String(labelEl.textContent || "").trim() !== "Create File Request") {
+        labelEl.textContent = "Create File Request";
+      }
+      return;
+    }
+
+    var textSet = false;
+    function setFirstTextNode(node) {
+      if (!node || textSet) return;
+      var child = node.firstChild;
+      while (child) {
+        if (child.nodeType === 3 && String(child.nodeValue || "").trim()) {
+          if (String(child.nodeValue || "") !== "Create File Request") {
+            child.nodeValue = "Create File Request";
+          }
+          textSet = true;
+          return;
+        }
+        if (child.nodeType === 1) {
+          if (!(icon && (child === icon || (child.contains && child.contains(icon))))) {
+            setFirstTextNode(child);
+            if (textSet) return;
+          }
+        }
+        child = child.nextSibling;
+      }
+    }
+    setFirstTextNode(itemEl);
+
+    if (!textSet) {
+      var span = document.createElement("span");
+      span.textContent = "Create File Request";
+      itemEl.appendChild(span);
+    }
+  }
+
+  function resolveUploadRequestDestPath() {
+    var rowEl = getSelectedFilesRowEl();
+    var decodedPath = extractSelectedPathFromFilesRow(rowEl);
+    if (decodedPath) return decodedPath;
+
+    if (isFilesPage()) {
+      var dir = getFilesDirPath();
+      if (dir && dir !== "/") return dir;
+    }
+    return null;
+  }
+
+  function bindUploadRequestMenuItem(itemEl) {
+    if (!itemEl || itemEl.getAttribute("data-droppr-upload-request-bound") === "1") return;
+    itemEl.setAttribute("data-droppr-upload-request-bound", "1");
+
+    var handler = function (e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      var decodedPath = resolveUploadRequestDestPath();
+      if (!decodedPath) {
+        showAutoShareModal({
+          title: "Select a destination folder",
+          subtitle: "",
+          url: "",
+          note: "Open Files, go to the destination folder, then click Create File Request again.",
+          autoCopy: false,
+        });
+        return;
+      }
+      showUploadRequestCreationModal(decodedPath);
+    };
+
+    itemEl.addEventListener("click", handler);
+    itemEl.addEventListener("keydown", function (e) {
+      var key = String(e && e.key || "");
+      if (key !== "Enter" && key !== " ") return;
+      handler(e);
+    });
+  }
+
+  function ensureUploadRequestButton() {
+    var tNow = nowMs();
+    if (tNow - uploadRequestMenuLastEnsureAt < 250) return;
+    uploadRequestMenuLastEnsureAt = tNow;
+
+    // Remove legacy inline clones/floating action button.
+    var inlineButtons = document.querySelectorAll ? document.querySelectorAll("." + UPLOAD_REQUEST_BTN_CLASS) : [];
+    for (var i = 0; i < inlineButtons.length; i++) {
+      var oldBtn = inlineButtons[i];
+      if (!oldBtn) continue;
+      if (oldBtn.parentNode) oldBtn.parentNode.removeChild(oldBtn);
+    }
+
+    var floatingBtn = document.getElementById(UPLOAD_REQUEST_FAB_ID);
+    if (floatingBtn && floatingBtn.parentNode) floatingBtn.parentNode.removeChild(floatingBtn);
+
+    var existing = document.getElementById(UPLOAD_REQUEST_MENU_ID);
+    if (!isLoggedIn()) {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return;
+    }
+
+    ensureUploadRequestStyles();
+    var ctx = findUploadRequestMenuContext();
+    if (!ctx || !ctx.parent || !ctx.template) return;
+
+    if (!existing) {
+      existing = ctx.template.cloneNode(true);
+      if (existing.removeAttribute) {
+        existing.removeAttribute("href");
+        existing.removeAttribute("to");
+      }
+      if (existing.classList) {
+        existing.classList.remove("active");
+        existing.classList.remove("selected");
+        existing.classList.remove("v-list-item--active");
+        existing.classList.remove("router-link-active");
+        existing.classList.remove("router-link-exact-active");
+      }
+      existing.id = UPLOAD_REQUEST_MENU_ID;
+      existing.setAttribute("role", "button");
+      existing.setAttribute("tabindex", "0");
+      existing.setAttribute("aria-label", "Create File Request");
+      existing.title = "Create File Request";
+
+      var dupeIds = existing.querySelectorAll ? existing.querySelectorAll("[id]") : [];
+      for (var d = 0; d < dupeIds.length; d++) dupeIds[d].removeAttribute("id");
+
+      setUploadRequestMenuItemContent(existing);
+      bindUploadRequestMenuItem(existing);
+      existing.setAttribute("data-droppr-upload-request-labeled", "1");
+    } else {
+      if (existing.getAttribute("data-droppr-upload-request-labeled") !== "1") {
+        setUploadRequestMenuItemContent(existing);
+        existing.setAttribute("data-droppr-upload-request-labeled", "1");
+      }
+      if (existing.getAttribute("data-droppr-upload-request-bound") !== "1") {
+        bindUploadRequestMenuItem(existing);
+      }
+    }
+
+    if (ctx.beforeEl && ctx.beforeEl.parentNode === ctx.parent) {
+      if (existing !== ctx.beforeEl.previousElementSibling) {
+        ctx.parent.insertBefore(existing, ctx.beforeEl);
+      }
+    } else if (existing.parentNode !== ctx.parent) {
+      ctx.parent.appendChild(existing);
+    }
+  }
+
+  // ============ ROBUST SHARE FUNCTIONALITY ============
+
+  function ensureRobustShareStyles() {
+    if (document.getElementById(ROBUST_SHARE_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = ROBUST_SHARE_STYLE_ID;
+    style.textContent =
+      "." + ROBUST_SHARE_BTN_CLASS + " {\n" +
+      "  margin-left: 6px;\n" +
+      "  background: #059669 !important;\n" +
+      "}\n" +
+      "." + ROBUST_SHARE_BTN_CLASS + ":hover {\n" +
+      "  background: #047857 !important;\n" +
+      "}\n" +
+      "." + ROBUST_SHARE_BTN_CLASS + "[disabled] {\n" +
+      "  opacity: 0.55;\n" +
+      "  cursor: not-allowed;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  right: 18px;\n" +
+      "  bottom: 74px;\n" +
+      "  z-index: 2147483001;\n" +
+      "  width: 480px;\n" +
+      "  max-width: calc(100vw - 36px);\n" +
+      "  border-radius: 14px;\n" +
+      "  background: var(--droppr-overlay-bg, rgba(17, 24, 39, 0.98));\n" +
+      "  color: var(--text-primary, #e5e7eb);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.12));\n" +
+      "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  overflow: hidden;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .hdr {\n" +
+      "  display: flex;\n" +
+      "  align-items: flex-start;\n" +
+      "  justify-content: space-between;\n" +
+      "  gap: 12px;\n" +
+      "  padding: 14px 14px 8px 14px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .title {\n" +
+      "  font-size: 14px;\n" +
+      "  font-weight: 800;\n" +
+      "  line-height: 1.2;\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .subtitle {\n" +
+      "  font-size: 12px;\n" +
+      "  line-height: 1.2;\n" +
+      "  margin-top: 4px;\n" +
+      "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
+      "  word-break: break-word;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .close {\n" +
+      "  appearance: none;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.2));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  width: 28px;\n" +
+      "  height: 28px;\n" +
+      "  border-radius: 10px;\n" +
+      "  cursor: pointer;\n" +
+      "  font-weight: 800;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .body {\n" +
+      "  padding: 0 14px 14px 14px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field {\n" +
+      "  margin-bottom: 12px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field label {\n" +
+      "  display: block;\n" +
+      "  font-size: 12px;\n" +
+      "  color: var(--text-muted, #888);\n" +
+      "  margin-bottom: 4px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field input[type='text'],\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field input[type='password'],\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field input[type='number'] {\n" +
+      "  width: 100%;\n" +
+      "  box-sizing: border-box;\n" +
+      "  padding: 8px 10px;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.15));\n" +
+      "  border-radius: 8px;\n" +
+      "  background: var(--input-bg, rgba(255,255,255,0.06));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  font-size: 13px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field.checkbox {\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  gap: 8px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field.checkbox input {\n" +
+      "  width: 16px;\n" +
+      "  height: 16px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .field.checkbox label {\n" +
+      "  margin-bottom: 0;\n" +
+      "  font-size: 13px;\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .actions {\n" +
+      "  display: flex;\n" +
+      "  gap: 8px;\n" +
+      "  margin-top: 12px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .btn {\n" +
+      "  padding: 8px 16px;\n" +
+      "  border: none;\n" +
+      "  border-radius: 8px;\n" +
+      "  font-size: 13px;\n" +
+      "  font-weight: 600;\n" +
+      "  cursor: pointer;\n" +
+      "  transition: background 0.15s;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .btn.primary {\n" +
+      "  background: #059669;\n" +
+      "  color: #fff;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .btn.primary:hover {\n" +
+      "  background: #047857;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .btn.primary:disabled {\n" +
+      "  background: #6b7280;\n" +
+      "  cursor: not-allowed;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .btn.secondary {\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.15));\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .note {\n" +
+      "  margin-top: 12px;\n" +
+      "  font-size: 11px;\n" +
+      "  color: var(--text-muted, #888);\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .result {\n" +
+      "  margin-top: 12px;\n" +
+      "  padding: 10px;\n" +
+      "  background: var(--success-bg, rgba(5, 150, 105, 0.15));\n" +
+      "  border: 1px solid rgba(5, 150, 105, 0.3);\n" +
+      "  border-radius: 8px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .result .url-row {\n" +
+      "  display: flex;\n" +
+      "  gap: 8px;\n" +
+      "  margin-top: 8px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .result input {\n" +
+      "  flex: 1;\n" +
+      "  padding: 6px 8px;\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.15));\n" +
+      "  border-radius: 6px;\n" +
+      "  background: var(--input-bg, rgba(255,255,255,0.06));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  font-size: 12px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .result .btn {\n" +
+      "  padding: 6px 12px;\n" +
+      "  font-size: 12px;\n" +
+      "}\n" +
+      "#" + ROBUST_SHARE_MODAL_ID + " .error {\n" +
+      "  margin-top: 8px;\n" +
+      "  padding: 8px;\n" +
+      "  background: rgba(220, 38, 38, 0.15);\n" +
+      "  border: 1px solid rgba(220, 38, 38, 0.3);\n" +
+      "  border-radius: 6px;\n" +
+      "  color: #fca5a5;\n" +
+      "  font-size: 12px;\n" +
+      "}\n";
+    document.head.appendChild(style);
+  }
+
+  function dismissRobustShareModal() {
+    var existing = document.getElementById(ROBUST_SHARE_MODAL_ID);
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function showRobustShareCreationModal(path) {
+    ensureRobustShareStyles();
+    dismissRobustShareModal();
+
+    var modal = document.createElement("div");
+    modal.id = ROBUST_SHARE_MODAL_ID;
+
+    var header = document.createElement("div");
+    header.className = "hdr";
+
+    var headerText = document.createElement("div");
+    var title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "Create Robust Share";
+
+    var subtitle = document.createElement("div");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "Large file support (up to 100GB) with resume capability";
+
+    headerText.appendChild(title);
+    headerText.appendChild(subtitle);
+
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "close";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", dismissRobustShareModal);
+
+    header.appendChild(headerText);
+    header.appendChild(closeBtn);
+
+    var body = document.createElement("div");
+    body.className = "body";
+
+    // Path field (readonly)
+    var pathField = document.createElement("div");
+    pathField.className = "field";
+    var pathLabel = document.createElement("label");
+    pathLabel.textContent = "Path";
+    var pathInput = document.createElement("input");
+    pathInput.type = "text";
+    pathInput.readOnly = true;
+    pathInput.value = path;
+    pathField.appendChild(pathLabel);
+    pathField.appendChild(pathInput);
+
+    // Title field
+    var titleField = document.createElement("div");
+    titleField.className = "field";
+    var titleLabel = document.createElement("label");
+    titleLabel.textContent = "Title (optional)";
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.placeholder = "My Files";
+    titleInput.id = "robust-share-title";
+    titleField.appendChild(titleLabel);
+    titleField.appendChild(titleInput);
+
+    // Expiry field
+    var expiryField = document.createElement("div");
+    expiryField.className = "field";
+    var expiryLabel = document.createElement("label");
+    expiryLabel.textContent = "Expires in (hours) — 0 = never";
+    var expiryInput = document.createElement("input");
+    expiryInput.type = "number";
+    expiryInput.min = "0";
+    expiryInput.step = "1";
+    var defaultExpire = null;
+    try {
+      defaultExpire = localStorage.getItem(ROBUST_SHARE_EXPIRE_STORAGE_KEY);
+    } catch (e) {
+      defaultExpire = null;
+    }
+    var defaultExpireHours = parseIntOrNull(defaultExpire);
+    if (defaultExpireHours == null || defaultExpireHours < 0) defaultExpireHours = 168;
+    expiryInput.value = String(defaultExpireHours);
+    expiryField.appendChild(expiryLabel);
+    expiryField.appendChild(expiryInput);
+
+    // Password checkbox
+    var pwCheckField = document.createElement("div");
+    pwCheckField.className = "field checkbox";
+    var pwCheckbox = document.createElement("input");
+    pwCheckbox.type = "checkbox";
+    pwCheckbox.id = "robust-share-pw-enabled";
+    var pwCheckLabel = document.createElement("label");
+    pwCheckLabel.setAttribute("for", "robust-share-pw-enabled");
+    pwCheckLabel.textContent = "Password protect";
+    pwCheckField.appendChild(pwCheckbox);
+    pwCheckField.appendChild(pwCheckLabel);
+
+    // Password field
+    var pwField = document.createElement("div");
+    pwField.className = "field";
+    pwField.style.display = "none";
+    var pwLabel = document.createElement("label");
+    pwLabel.textContent = "Password";
+    var pwInput = document.createElement("input");
+    pwInput.type = "password";
+    pwInput.id = "robust-share-password";
+    pwInput.placeholder = "Enter password";
+    pwField.appendChild(pwLabel);
+    pwField.appendChild(pwInput);
+
+    pwCheckbox.addEventListener("change", function() {
+      pwField.style.display = pwCheckbox.checked ? "block" : "none";
+    });
+
+    // Actions
+    var actions = document.createElement("div");
+    actions.className = "actions";
+    var createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = "btn primary";
+    createBtn.textContent = "Create Share";
+    createBtn.id = "robust-share-create-btn";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn secondary";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", dismissRobustShareModal);
+    actions.appendChild(createBtn);
+    actions.appendChild(cancelBtn);
+
+    // Note
+    var note = document.createElement("div");
+    note.className = "note";
+    note.textContent = "Recipients can download all files or select individual files. Large files up to 100GB supported with resume capability.";
+
+    // Result container (hidden initially)
+    var resultContainer = document.createElement("div");
+    resultContainer.className = "result";
+    resultContainer.style.display = "none";
+
+    // Error container (hidden initially)
+    var errorContainer = document.createElement("div");
+    errorContainer.className = "error";
+    errorContainer.style.display = "none";
+
+    body.appendChild(pathField);
+    body.appendChild(titleField);
+    body.appendChild(expiryField);
+    body.appendChild(pwCheckField);
+    body.appendChild(pwField);
+    body.appendChild(actions);
+    body.appendChild(note);
+    body.appendChild(resultContainer);
+    body.appendChild(errorContainer);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    document.body.appendChild(modal);
+
+    // Create button handler
+    createBtn.addEventListener("click", function() {
+      createBtn.disabled = true;
+      createBtn.textContent = "Creating...";
+      errorContainer.style.display = "none";
+      resultContainer.style.display = "none";
+
+      var expiresHours = parseIntOrNull(expiryInput.value);
+      if (expiresHours == null || expiresHours < 0) expiresHours = 0;
+      try {
+        localStorage.setItem(ROBUST_SHARE_EXPIRE_STORAGE_KEY, String(expiresHours));
+      } catch (e2) {}
+
+      if (pwCheckbox.checked && !String(pwInput.value || "").trim()) {
+        createBtn.disabled = false;
+        createBtn.textContent = "Create Share";
+        errorContainer.textContent = "Password is enabled but empty.";
+        errorContainer.style.display = "block";
+        return;
+      }
+
+      var payload = {
+        path: path,
+        title: titleInput.value || "",
+        password: pwCheckbox.checked ? pwInput.value : "",
+        expires_hours: expiresHours,
+      };
+
+      var token = getAuthToken();
+      fetch("/api/robust-share/create", {
+        method: "POST",
+        headers: {
+          "X-Auth": token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(function(resp) {
+        if (!resp.ok) {
+          return resp.json().then(function(data) {
+            throw new Error(data.error || "Failed to create share");
+          });
+        }
+        return resp.json();
+      })
+      .then(function(data) {
+        createBtn.textContent = "Created!";
+        createBtn.style.background = "#10b981";
+
+        var shareUrl = window.location.origin + data.share_url;
+
+        // Show result
+        resultContainer.innerHTML = "";
+        var resultTitle = document.createElement("div");
+        resultTitle.style.fontWeight = "700";
+        resultTitle.style.marginBottom = "4px";
+        resultTitle.textContent = "Share link created!";
+        resultContainer.appendChild(resultTitle);
+
+        var resultInfo = document.createElement("div");
+        resultInfo.style.fontSize = "12px";
+        resultInfo.style.marginBottom = "8px";
+        resultInfo.style.color = "var(--text-muted, #888)";
+        resultInfo.textContent = data.file_count + " file(s) • " + formatBytes(data.total_size);
+        resultContainer.appendChild(resultInfo);
+
+        var urlRow = document.createElement("div");
+        urlRow.className = "url-row";
+        var urlInput = document.createElement("input");
+        urlInput.type = "text";
+        urlInput.readOnly = true;
+        urlInput.value = shareUrl;
+        urlInput.addEventListener("focus", function() {
+          try { urlInput.select(); } catch(e) {}
+        });
+        var copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "btn primary";
+        copyBtn.textContent = "Copy";
+        copyBtn.addEventListener("click", function() {
+          copyText(shareUrl)
+            .then(function() {
+              copyBtn.textContent = "Copied!";
+              setTimeout(function() {
+                if (document.body.contains(copyBtn)) copyBtn.textContent = "Copy";
+              }, 1200);
+            })
+            .catch(function() {
+              try { urlInput.focus(); urlInput.select(); } catch(e) {}
+            });
+        });
+        var openBtn = document.createElement("button");
+        openBtn.type = "button";
+        openBtn.className = "btn secondary";
+        openBtn.textContent = "Open";
+        openBtn.addEventListener("click", function() {
+          try { window.open(shareUrl, "_blank", "noopener"); }
+          catch(e) { window.location.href = shareUrl; }
+        });
+        urlRow.appendChild(urlInput);
+        urlRow.appendChild(copyBtn);
+        urlRow.appendChild(openBtn);
+        resultContainer.appendChild(urlRow);
+
+        resultContainer.style.display = "block";
+
+        // Auto-copy
+        copyText(shareUrl).catch(function() {});
+      })
+      .catch(function(err) {
+        createBtn.disabled = false;
+        createBtn.textContent = "Create Share";
+        errorContainer.textContent = err.message || "Failed to create share";
+        errorContainer.style.display = "block";
+      });
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    var k = 1024;
+    var sizes = ["B", "KB", "MB", "GB", "TB"];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
+
+  function ensureRobustShareButton() {
+    if (!isLoggedIn()) return;
+    if (!isFilesPage()) return;
+
+    ensureRobustShareStyles();
+
+    function isInDialogOrMenu(el) {
+      try {
+        return !!(
+          el &&
+          el.closest &&
+          (el.closest(".v-dialog__content--active") ||
+            el.closest(".v-dialog--active") ||
+            el.closest(".v-menu__content") ||
+            el.closest("[role=\"dialog\"]"))
+        );
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function isVisible(el) {
+      if (!el) return false;
+      try {
+        if (el.offsetParent) return true;
+        var rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        return !!(rect && rect.width > 0 && rect.height > 0);
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function attachToShareButton(shareBtn) {
+      if (!shareBtn) return false;
+      if (shareBtn.classList && shareBtn.classList.contains(ROBUST_SHARE_BTN_CLASS)) return false;
+      if (isInDialogOrMenu(shareBtn)) return false;
+      if (!isVisible(shareBtn)) return false;
+
+      var host = shareBtn.parentNode;
+      if (!host || !host.insertBefore) return false;
+
+      var disabled =
+        !!shareBtn.disabled ||
+        shareBtn.getAttribute("disabled") != null ||
+        shareBtn.getAttribute("aria-disabled") === "true" ||
+        (shareBtn.classList && shareBtn.classList.contains("v-btn--disabled"));
+
+      var existing = host.querySelector ? host.querySelector("." + ROBUST_SHARE_BTN_CLASS) : null;
+      if (existing) {
+        existing.disabled = disabled;
+        try {
+          if (existing.classList) {
+            if (disabled) existing.classList.add("v-btn--disabled");
+            else existing.classList.remove("v-btn--disabled");
+          }
+        } catch (e3) {}
+
+        try {
+          existing.style.display = shareBtn.style && shareBtn.style.display === "none" ? "none" : "";
+        } catch (e4) {}
+        return true;
+      }
+
+      var newBtn = shareBtn.cloneNode(true);
+      if (newBtn.classList && newBtn.classList.add) newBtn.classList.add(ROBUST_SHARE_BTN_CLASS);
+      newBtn.title = "Robust Share (Large Files up to 100GB)";
+      newBtn.setAttribute("aria-label", "Robust Share (Large Files up to 100GB)");
+      setMaterialIconText(newBtn, "cloud_upload");
+      newBtn.disabled = disabled;
+
+      newBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var rowEl = getSelectedFilesRowEl();
+        var decodedPath = extractSelectedPathFromFilesRow(rowEl);
+        if (!decodedPath) {
+          showAutoShareModal({
+            title: "Select a file or folder",
+            subtitle: "",
+            url: "",
+            note: "Select a file/folder in the list first, then click Robust Share again.",
+            autoCopy: false,
+          });
+          return;
+        }
+
+        showRobustShareCreationModal(decodedPath);
+      });
+
+      // Insert after the quick share button if it exists, otherwise after stream share button
+      var quickShareBtn = host.querySelector ? host.querySelector("." + QUICK_SHARE_BTN_CLASS) : null;
+      if (quickShareBtn) {
+        host.insertBefore(newBtn, quickShareBtn.nextSibling);
+      } else {
+        var streamShareBtn = host.querySelector ? host.querySelector("." + FILES_STREAM_SHARE_BTN_CLASS) : null;
+        if (streamShareBtn) {
+          host.insertBefore(newBtn, streamShareBtn.nextSibling);
+        } else {
+          host.insertBefore(newBtn, shareBtn.nextSibling);
+        }
+      }
+      return true;
+    }
+
+    var iconNodes = document.querySelectorAll
+      ? document.querySelectorAll("i.material-icons, span.material-icons, .material-icons")
+      : [];
+    for (var i = 0; i < iconNodes.length; i++) {
+      var icon = iconNodes[i];
+      if (!icon) continue;
+      var txt = String(icon.textContent || "").trim();
+      if (txt !== "share") continue;
+
+      var shareBtn = null;
+      try {
+        shareBtn = icon.closest ? icon.closest("button, a") : null;
+      } catch (e) {
+        shareBtn = null;
+      }
+      if (attachToShareButton(shareBtn)) return;
+    }
+
+    var candidates = document.querySelectorAll
+      ? document.querySelectorAll("button, a[href]")
+      : [];
+    for (var j = 0; j < candidates.length; j++) {
+      var el = candidates[j];
+      if (!el) continue;
+      if (isInDialogOrMenu(el)) continue;
+      if (!isVisible(el)) continue;
+
+      var label = (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("title"))) || "";
+      var labelLower = String(label || "").toLowerCase();
+      var textLower = String(el.textContent || "").trim().toLowerCase();
+
+      if (labelLower.indexOf("share") === -1 && textLower !== "share") continue;
+
+      if (attachToShareButton(el)) return;
+    }
+  }
+
+  // ============ SESSION LOGOUT CONTROLS ============
+
+  var _dropprClientConfigState = { promise: null, session: null };
+
+  function getDefaultSessionConfig() {
+    return {
+      admin_idle_minutes: 240,
+      user_idle_minutes: 480,
+      admin_max_minutes: 720,
+      user_max_minutes: 1440,
+      warning_seconds: 60,
+    };
+  }
+
+  function clampNumber(value, min, max, fallback) {
+    var n = parseIntOrNull(value);
+    if (n == null) return fallback;
+    if (typeof min === "number" && n < min) return min;
+    if (typeof max === "number" && n > max) return max;
+    return n;
+  }
+
+  function fetchClientConfig() {
+    if (_dropprClientConfigState.promise) return _dropprClientConfigState.promise;
+
+    _dropprClientConfigState.promise = fetch("/api/droppr/client-config", { method: "GET" })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          if (!res.ok) throw new Error("client-config failed: " + res.status);
+          try {
+            return JSON.parse(text || "{}");
+          } catch (e) {
+            return {};
+          }
+        });
+      })
+      .catch(function () {
+        return {};
+      })
+      .then(function (cfg) {
+        var s = cfg && cfg.session ? cfg.session : null;
+        var d = getDefaultSessionConfig();
+        _dropprClientConfigState.session = {
+          admin_idle_minutes: clampNumber(s && s.admin_idle_minutes, 0, 525600, d.admin_idle_minutes),
+          user_idle_minutes: clampNumber(s && s.user_idle_minutes, 0, 525600, d.user_idle_minutes),
+          admin_max_minutes: clampNumber(s && s.admin_max_minutes, 0, 525600, d.admin_max_minutes),
+          user_max_minutes: clampNumber(s && s.user_max_minutes, 0, 525600, d.user_max_minutes),
+          warning_seconds: clampNumber(s && s.warning_seconds, 0, 3600, d.warning_seconds),
+        };
+        return _dropprClientConfigState.session;
+      })
+      .finally(function () {
+        _dropprClientConfigState.promise = null;
+      });
+
+    return _dropprClientConfigState.promise;
+  }
+
+  function fnv1aHash(str) {
+    var s = String(str || "");
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ("0000000" + h.toString(16)).slice(-8);
+  }
+
+  function readStoredInt(key) {
+    try {
+      var v = localStorage.getItem(key);
+      var n = parseIntOrNull(v);
+      return n == null ? null : n;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeStoredInt(key, value) {
+    try {
+      localStorage.setItem(key, String(value));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function clearSessionKeys() {
+    try { localStorage.removeItem(SESSION_TOKEN_HASH_KEY); } catch (e) {}
+    try { localStorage.removeItem(SESSION_START_MS_KEY); } catch (e2) {}
+    try { localStorage.removeItem(SESSION_LAST_ACTIVITY_MS_KEY); } catch (e3) {}
+    try { localStorage.removeItem(SESSION_IS_ADMIN_KEY); } catch (e4) {}
+  }
+
+  function dropprLogout(reason) {
+    var token = getAuthToken();
+    try {
+      fetch("/api/logout", { method: "POST", headers: token ? { "X-Auth": token } : {} }).catch(function () {});
+    } catch (e) {}
+
+    clearSessionKeys();
+    try { localStorage.removeItem("jwt"); } catch (e2) {}
+    try { document.cookie = "auth=; Max-Age=0; path=/"; } catch (e3) {}
+    try { document.cookie = "auth=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"; } catch (e4) {}
+
+    if (isDropprDebugEnabled()) setDebugBadge("Droppr auto-logout: " + String(reason || "timeout"));
+
+    try {
+      window.location.reload();
+    } catch (e5) {
+      try { window.location.href = "/"; } catch (e6) {}
+    }
+  }
+
+  function ensureSessionStyles() {
+    if (document.getElementById(SESSION_STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = SESSION_STYLE_ID;
+    style.textContent =
+      "#" + SESSION_MODAL_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  top: 18px;\n" +
+      "  left: 50%;\n" +
+      "  transform: translateX(-50%);\n" +
+      "  z-index: 2147483003;\n" +
+      "  width: 640px;\n" +
+      "  max-width: calc(100vw - 36px);\n" +
+      "  border-radius: 14px;\n" +
+      "  background: var(--droppr-overlay-bg, rgba(17, 24, 39, 0.98));\n" +
+      "  color: var(--text-primary, #e5e7eb);\n" +
+      "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.12));\n" +
+      "  box-shadow: 0 26px 60px -30px rgba(0,0,0,0.85);\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  overflow: hidden;\n" +
+      "}\n" +
+      "#" + SESSION_MODAL_ID + " .row {\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  gap: 12px;\n" +
+      "  padding: 14px;\n" +
+      "}\n" +
+      "#" + SESSION_MODAL_ID + " .icon {\n" +
+      "  width: 34px;\n" +
+      "  height: 34px;\n" +
+      "  border-radius: 12px;\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  justify-content: center;\n" +
+      "  background: rgba(245, 158, 11, 0.14);\n" +
+      "  border: 1px solid rgba(245, 158, 11, 0.22);\n" +
+      "  color: rgba(253, 230, 138, 0.95);\n" +
+      "  flex: 0 0 auto;\n" +
+      "}\n" +
+      "#" + SESSION_MODAL_ID + " .txt { flex: 1 1 auto; min-width: 0; }\n" +
+      "#" + SESSION_MODAL_ID + " .title { font-size: 13px; font-weight: 900; line-height: 1.15; }\n" +
+      "#" + SESSION_MODAL_ID + " .status { margin-top: 4px; font-size: 12px; color: var(--droppr-overlay-muted, rgba(229,231,235,0.82)); line-height: 1.2; }\n" +
+      "#" + SESSION_MODAL_ID + " .actions { display: flex; gap: 8px; flex: 0 0 auto; }\n" +
+      "#" + SESSION_MODAL_ID + " .btn {\n" +
+      "  cursor: pointer;\n" +
+      "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
+      "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
+      "  color: var(--text-primary, #fff);\n" +
+      "  font-weight: 900;\n" +
+      "  font-size: 12px;\n" +
+      "  padding: 9px 11px;\n" +
+      "  border-radius: 12px;\n" +
+      "}\n" +
+      "#" + SESSION_MODAL_ID + " .btn.primary { background: rgba(245, 158, 11, 0.92); border-color: rgba(255,255,255,0.0); color: #1a1200; }\n" +
+      "#" + SESSION_MODAL_ID + " .btn.primary:hover { background: rgba(217, 119, 6, 0.95); }\n";
+    document.head.appendChild(style);
+  }
+
+  var _sessionModalState = { shown: false, remainingSec: 0, reason: "", timer: null };
+
+  function dismissSessionModal() {
+    var existing = document.getElementById(SESSION_MODAL_ID);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    _sessionModalState.shown = false;
+    _sessionModalState.reason = "";
+    _sessionModalState.remainingSec = 0;
+    if (_sessionModalState.timer) {
+      clearInterval(_sessionModalState.timer);
+      _sessionModalState.timer = null;
+    }
+  }
+
+  function showSessionModal(opts) {
+    var options = opts || {};
+    ensureSessionStyles();
+
+    var existing = document.getElementById(SESSION_MODAL_ID);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    var modal = document.createElement("div");
+    modal.id = SESSION_MODAL_ID;
+
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var icon = document.createElement("div");
+    icon.className = "icon";
+    icon.innerHTML = '<i class="material-icons">schedule</i>';
+
+    var txt = document.createElement("div");
+    txt.className = "txt";
+    var title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "Session ending soon";
+    var status = document.createElement("div");
+    status.className = "status";
+
+    txt.appendChild(title);
+    txt.appendChild(status);
+
+    var actions = document.createElement("div");
+    actions.className = "actions";
+
+    var stayBtn = document.createElement("button");
+    stayBtn.type = "button";
+    stayBtn.className = "btn primary";
+    stayBtn.textContent = "Stay signed in";
+
+    var logoutBtn = document.createElement("button");
+    logoutBtn.type = "button";
+    logoutBtn.className = "btn";
+    logoutBtn.textContent = "Log out";
+
+    actions.appendChild(stayBtn);
+    actions.appendChild(logoutBtn);
+
+    row.appendChild(icon);
+    row.appendChild(txt);
+    row.appendChild(actions);
+
+    modal.appendChild(row);
+    document.body.appendChild(modal);
+
+    function setText() {
+      var sec = _sessionModalState.remainingSec || 0;
+      var r = _sessionModalState.reason || "timeout";
+      var why = r === "max" ? "security policy" : "inactivity";
+      status.textContent = "Logging out in " + sec + "s due to " + why + ".";
+    }
+
+    stayBtn.addEventListener("click", function () {
+      var now = nowMs();
+      writeStoredInt(SESSION_LAST_ACTIVITY_MS_KEY, now);
+      dismissSessionModal();
+    });
+
+    logoutBtn.addEventListener("click", function () {
+      dropprLogout("manual");
+    });
+
+    setText();
+    _sessionModalState.timer = setInterval(setText, 1000);
+  }
+
+  function detectIsAdmin(token) {
+    if (!token) return Promise.resolve(false);
+    return fetch("/api/users", { method: "GET", headers: { "X-Auth": token } })
+      .then(function (res) { return !!res.ok; })
+      .catch(function () { return false; });
+  }
+
+  function startSessionEnforcer() {
+    if (window.__dropprSessionEnforcerBooted) return;
+    window.__dropprSessionEnforcerBooted = true;
+
+    var lastActivityWriteAt = 0;
+    function noteActivity() {
+      if (!isLoggedIn()) return;
+      var t = nowMs();
+      if (t - lastActivityWriteAt < 5000) return;
+      lastActivityWriteAt = t;
+      writeStoredInt(SESSION_LAST_ACTIVITY_MS_KEY, t);
+    }
+
+    ["mousemove", "mousedown", "keydown", "touchstart", "scroll"].forEach(function (evt) {
+      try { window.addEventListener(evt, noteActivity, { passive: true }); } catch (e) {
+        try { window.addEventListener(evt, noteActivity); } catch (e2) {}
+      }
+    });
+
+    // Sync activity across tabs.
+    try {
+      window.addEventListener("storage", function (e) {
+        if (!e) return;
+        if (e.key === SESSION_LAST_ACTIVITY_MS_KEY) {
+          // no-op; next tick reads latest value
+        }
+      });
+    } catch (e3) {}
+
+    // Ensure we have sane defaults even if config fetch fails.
+    var sessionCfg = getDefaultSessionConfig();
+    var lastCfgRefreshAt = 0;
+    function refreshClientConfig() {
+      lastCfgRefreshAt = nowMs();
+      fetchClientConfig().then(function (cfg) { if (cfg) sessionCfg = cfg; });
+    }
+    refreshClientConfig();
+
+    var isAdmin = null;
+    var adminCheckedAt = 0;
+
+    setInterval(function () {
+      var token = getAuthToken();
+      if (!token) {
+        isAdmin = null;
+        adminCheckedAt = 0;
+        dismissSessionModal();
+        return;
+      }
+
+      // Track session start per token.
+      var tokenHash = fnv1aHash(token);
+      var storedHash = null;
+      try { storedHash = localStorage.getItem(SESSION_TOKEN_HASH_KEY); } catch (e) { storedHash = null; }
+      if (storedHash !== tokenHash) {
+        clearSessionKeys();
+        writeStoredInt(SESSION_TOKEN_HASH_KEY, tokenHash);
+        var now = nowMs();
+        writeStoredInt(SESSION_START_MS_KEY, now);
+        writeStoredInt(SESSION_LAST_ACTIVITY_MS_KEY, now);
+        isAdmin = null;
+        adminCheckedAt = 0;
+      }
+
+      var startMs = readStoredInt(SESSION_START_MS_KEY);
+      var lastMs = readStoredInt(SESSION_LAST_ACTIVITY_MS_KEY);
+      var nowMsVal = nowMs();
+      if (startMs == null) startMs = nowMsVal;
+      if (lastMs == null) lastMs = nowMsVal;
+
+      // Refresh config occasionally (best-effort) so admin changes can propagate.
+      if (nowMsVal - lastCfgRefreshAt > 5 * 60 * 1000) {
+        refreshClientConfig();
+      }
+
+      // Determine admin/non-admin.
+      if (isAdmin == null) {
+        var storedIsAdmin = null;
+        try { storedIsAdmin = localStorage.getItem(SESSION_IS_ADMIN_KEY); } catch (e2) { storedIsAdmin = null; }
+        if (storedIsAdmin === "1") isAdmin = true;
+        else if (storedIsAdmin === "0") isAdmin = false;
+      }
+
+      if (isAdmin == null || nowMsVal - adminCheckedAt > 15 * 60 * 1000) {
+        adminCheckedAt = nowMsVal;
+        detectIsAdmin(token).then(function (v) {
+          isAdmin = !!v;
+          try { localStorage.setItem(SESSION_IS_ADMIN_KEY, isAdmin ? "1" : "0"); } catch (e3) {}
+        });
+      }
+
+      var idleMin = isAdmin ? sessionCfg.admin_idle_minutes : sessionCfg.user_idle_minutes;
+      var maxMin = isAdmin ? sessionCfg.admin_max_minutes : sessionCfg.user_max_minutes;
+      var warnSec = sessionCfg.warning_seconds || 0;
+
+      var idleRemainingMs = idleMin > 0 ? (idleMin * 60000 - (nowMsVal - lastMs)) : null;
+      var maxRemainingMs = maxMin > 0 ? (maxMin * 60000 - (nowMsVal - startMs)) : null;
+
+      var remainingMs = null;
+      var reason = "";
+      if (idleRemainingMs != null && maxRemainingMs != null) {
+        remainingMs = Math.min(idleRemainingMs, maxRemainingMs);
+        reason = idleRemainingMs <= maxRemainingMs ? "idle" : "max";
+      } else if (idleRemainingMs != null) {
+        remainingMs = idleRemainingMs;
+        reason = "idle";
+      } else if (maxRemainingMs != null) {
+        remainingMs = maxRemainingMs;
+        reason = "max";
+      } else {
+        dismissSessionModal();
+        return;
+      }
+
+      if (remainingMs <= 0) {
+        dropprLogout(reason);
+        return;
+      }
+
+      if (warnSec > 0 && remainingMs <= warnSec * 1000) {
+        var sec = Math.max(1, Math.ceil(remainingMs / 1000));
+        _sessionModalState.remainingSec = sec;
+        _sessionModalState.reason = reason;
+        if (!_sessionModalState.shown) {
+          _sessionModalState.shown = true;
+          showSessionModal({});
+        }
+      } else {
+        dismissSessionModal();
+      }
+    }, 1000);
+  }
+
   function boot() {
     patchUploadDetectors();
     patchFileInputs();
     ensureThemeToggle();
+    startSessionEnforcer();
     ensureAnalyticsButton();
-    ensureSettingsButton();
+    ensureManageButton();
+    ensureDropprSessionSettingsCard();
     ensureShareExpireButtons();
     ensureShareDialogStreamButtons();
     ensureFilesStreamShareButton();
+    ensureFilesQuickShareButton();
+    ensureRobustShareButton();
+    ensureUploadRequestButton();
     startVideoMetaWatcher();
     scheduleFilesVideoHydrate();
-    hydrateFileSizes();
     var observer = new MutationObserver(function () {
       ensureAnalyticsButton();
-      ensureSettingsButton();
+      ensureManageButton();
+      ensureDropprSessionSettingsCard();
       ensureShareExpireButtons();
       ensureShareDialogStreamButtons();
       ensureFilesStreamShareButton();
+      ensureFilesQuickShareButton();
+      ensureRobustShareButton();
+      ensureUploadRequestButton();
       scheduleFilesVideoHydrate();
-      hydrateFileSizes();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     filesVideoLastPathname = String(window.location && window.location.pathname);
     setInterval(function () {
+      ensureUploadRequestButton();
       if (!isFilesPage()) return;
       ensureFilesStreamShareButton();
-      hydrateFileSizes();
+      ensureFilesQuickShareButton();
+      ensureRobustShareButton();
       var cur = String(window.location && window.location.pathname);
       if (cur !== filesVideoLastPathname) {
         filesVideoLastPathname = cur;

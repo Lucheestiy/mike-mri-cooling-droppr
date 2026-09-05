@@ -12,3 +12,7 @@ media-server/__pycache__/
 
 cloudflare/creds/*
 !cloudflare/creds/.keep
+backups/
+data
+database
+backups

@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Upload Files</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,650;9..144,750&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0d1411;
+      --panel:rgba(22,33,28,0.94);
+      --panel2:rgba(15,24,20,0.9);
+      --border:rgba(145,187,169,0.2);
+      --text:#edf4ef;
+      --muted:#a0afa7;
+      --muted2:#74867d;
+      --accent:#73cfad;
+      --accent2:#a9e2cb;
+      --good:#79d9a7;
+      --bad:#ef8e8e;
+      --warn:#e6b96f;
+      --radius:10px;
+      --shadow:0 28px 80px -42px rgba(0,0,0,0.9);
+    }
+
+    [data-theme="light"]{
+      --bg:#f2eee4;
+      --panel:rgba(255,253,248,0.96);
+      --panel2:rgba(248,245,237,0.98);
+      --border:rgba(26,58,45,0.16);
+      --text:#17231e;
+      --muted:#56665e;
+      --muted2:#758078;
+      --accent:#087b59;
+      --accent2:#075f48;
+      --shadow:0 24px 58px -38px rgba(37,47,41,0.35);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:Manrope,"Avenir Next",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100%;
+      background-image:
+        linear-gradient(rgba(115,207,173,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(115,207,173,0.025) 1px, transparent 1px),
+        radial-gradient(at 12% 0%, rgba(70,135,109,0.22) 0, transparent 44%),
+        radial-gradient(at 94% 8%, rgba(169,226,203,0.08) 0, transparent 40%);
+      background-size:32px 32px,32px 32px,auto,auto;
+    }
+
+    [data-theme="light"] body,
+    body[data-theme="light"]{
+      background-image:
+        linear-gradient(rgba(8,123,89,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(8,123,89,0.035) 1px, transparent 1px),
+        radial-gradient(at 10% 0%, rgba(8,123,89,0.10) 0, transparent 50%);
+      background-size:32px 32px,32px 32px,auto;
+    }
+
+    a{color:inherit}
+
+    .wrap{
+      max-width:980px;
+      margin:0 auto;
+      padding:24px;
+      padding-top:max(24px, env(safe-area-inset-top, 0px));
+      padding-bottom:max(24px, env(safe-area-inset-bottom, 0px));
+    }
+
+    .topbar{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      margin-bottom:18px;
+    }
+
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      min-width:0;
+    }
+
+    .logo{
+      width:44px;
+      height:44px;
+      border-radius:8px;
+      background:#20372e;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 18px 35px -22px rgba(115,207,173,0.65);
+      border:1px solid rgba(255,255,255,0.14);
+      flex:0 0 auto;
+    }
+    [data-theme="light"] .logo{ border:1px solid rgba(0,0,0,0.08); }
+    .logo .material-icons{font-size:22px;color:#fff}
+
+    .title{
+      min-width:0;
+    }
+    .title h1{
+      font-family:Fraunces,Georgia,serif;
+      font-size:clamp(1.35rem,3vw,1.8rem);
+      font-weight:750;
+      letter-spacing:-0.02em;
+      line-height:1.15;
+    }
+    .eyebrow{
+      margin-bottom:5px;
+      color:var(--accent);
+      font-family:ui-monospace,"SFMono-Regular",monospace;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .title p{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:0.92rem;
+      line-height:1.25;
+      word-break:break-word;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+
+    .btn{
+      appearance:none;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:7px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      transition:transform .08s ease, background .15s ease, border-color .15s ease;
+      text-decoration:none;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{
+      background:var(--accent);
+      border-color:rgba(255,255,255,0.14);
+      color:#07140f;
+    }
+    .btn.primary:hover{background:var(--accent2)}
+    .btn.ghost{background:transparent}
+    .btn .material-icons{font-size:18px}
+
+    .card{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      backdrop-filter:blur(12px);
+    }
+
+    .card-hdr{
+      padding:16px 16px 14px;
+      border-bottom:1px solid var(--border);
+      background:rgba(6,13,10,0.3);
+    }
+    [data-theme="light"] .card-hdr{background:rgba(2,6,23,0.03)}
+    .card-hdr .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 14px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:5px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.06);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+    }
+    .pill.good{color:var(--good); border-color:rgba(121,217,167,0.28); background:rgba(121,217,167,0.09)}
+    .pill.bad{color:var(--bad); border-color:rgba(239,142,142,0.28); background:rgba(239,142,142,0.09)}
+    .pill.warn{color:var(--warn); border-color:rgba(230,185,111,0.28); background:rgba(230,185,111,0.09)}
+
+    .content{padding:16px}
+
+    .state{
+      display:none;
+      padding:32px 16px;
+      text-align:center;
+    }
+    .state.show{display:block}
+    .state .material-icons{
+      font-size:42px;
+      opacity:0.9;
+      margin-bottom:10px;
+    }
+    .state h2{font-size:1.05rem; margin-bottom:8px}
+    .state p{color:var(--muted); line-height:1.5; max-width:640px; margin:0 auto}
+
+    .gate{
+      display:none;
+      max-width:520px;
+      margin:0 auto;
+      padding:12px 0 0;
+    }
+    .gate .input-row{
+      display:flex;
+      gap:10px;
+      margin-top:12px;
+    }
+    .gate input{
+      flex:1 1 auto;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,0.18);
+      color:var(--text);
+      font-size:14px;
+      outline:none;
+    }
+    [data-theme="light"] .gate input{background:rgba(2,6,23,0.04)}
+    .gate .err{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(239,68,68,0.12);
+      border:1px solid rgba(239,68,68,0.22);
+      color:rgba(254,202,202,0.95);
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    .uploader{
+      display:none;
+      gap:14px;
+    }
+    .uploader.show{display:block}
+
+    .dropzone{
+      border:1.5px dashed rgba(148,163,184,0.35);
+      border-radius:var(--radius);
+      min-height:210px;
+      padding:28px;
+      background:var(--panel2);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      transition:border-color .15s ease, background .15s ease, transform .08s ease;
+    }
+    .dropzone.drag{
+      border-color:var(--accent);
+      background:rgba(115,207,173,0.08);
+    }
+    .dropzone .material-icons{font-size:30px; opacity:0.9}
+    .dropzone .hint{color:var(--muted); font-size:13px; line-height:1.4}
+
+    .meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-top:14px;
+    }
+    .meta .left{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    .meta .right{display:flex; gap:10px; align-items:center}
+
+    .filelist{
+      margin-top:14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .selection-notice{
+      display:none;
+      margin-top:14px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+    .selection-notice.show{display:block}
+    .selection-notice.bad{
+      border-color:rgba(239,68,68,0.22);
+      background:rgba(239,68,68,0.12);
+      color:rgba(254,202,202,0.95);
+    }
+    [data-theme="light"] .selection-notice.bad{color:rgba(153,27,27,0.95)}
+
+    .file{
+      padding:12px 12px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
+    .file .main{
+      min-width:0;
+      flex:1 1 auto;
+    }
+    .file .name{
+      font-weight:800;
+      font-size:13px;
+      word-break:break-word;
+    }
+    .file .sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .file .prog{
+      margin-top:8px;
+      height:8px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.10);
+      overflow:hidden;
+    }
+    .file .fill{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg, var(--accent), var(--accent2));
+      transition:width .12s ease;
+    }
+    .file .status{
+      white-space:nowrap;
+      font-weight:800;
+      font-size:12px;
+      color:var(--muted);
+      margin-top:2px;
+      text-align:right;
+      min-width:90px;
+    }
+    .file.ok .status{color:rgba(16,185,129,0.95)}
+    .file.bad .status{color:rgba(248,113,113,0.96)}
+    .file-actions-inline{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:flex-end;
+      flex:0 0 auto;
+    }
+    .remove-file{
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.06);
+      color:var(--muted);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+    }
+    .remove-file:hover{background:rgba(239,68,68,0.14); color:rgba(254,202,202,0.98)}
+    [data-theme="light"] .remove-file:hover{color:rgba(153,27,27,0.98)}
+    .remove-file:disabled{opacity:.45; cursor:not-allowed}
+    .remove-file .material-icons{font-size:18px}
+
+    .footer-note{
+      margin-top:14px;
+      color:var(--muted2);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .shareback{
+      display:none;
+      margin-top:14px;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+    }
+    .shareback.show{display:block}
+    .shareback .hdr{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .shareback .hdr .ttl{
+      font-weight:900;
+      font-size:13px;
+      letter-spacing:-0.01em;
+    }
+    .shareback .hdr .sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .shareback .mono{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,0.18);
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;
+      font-size:12px;
+      word-break:break-all;
+      color:rgba(226,232,240,0.95);
+    }
+    [data-theme=\"light\"] .shareback .mono{background:rgba(2,6,23,0.04); color:rgba(15,23,42,0.95)}
+    .shareback .err{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(239,68,68,0.12);
+      border:1px solid rgba(239,68,68,0.22);
+      color:rgba(254,202,202,0.95);
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    @media (max-width: 600px){
+      .wrap{
+        padding:16px;
+        padding-top:max(16px, env(safe-area-inset-top, 0px));
+        padding-bottom:max(16px, env(safe-area-inset-bottom, 0px));
+      }
+      .topbar{gap:10px; margin-bottom:14px}
+      .logo{width:42px; height:42px}
+      .top-actions .btn{width:42px; height:42px; justify-content:center; padding:0}
+      .card-hdr .row{align-items:stretch}
+      .pill{box-sizing:border-box; max-width:100%}
+      #statusPill{align-self:flex-start}
+      #rulesPill{width:100%; line-height:1.4}
+      #rulesText{min-width:0; overflow-wrap:anywhere}
+      .content{padding:16px}
+      .dropzone{min-height:190px; padding:22px 16px}
+      .meta .right{width:100%}
+      .meta .right .btn{flex:1 1 0; justify-content:center}
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      *, *::before, *::after{
+        scroll-behavior:auto !important;
+        transition-duration:0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"><span class="material-icons">move_to_inbox</span></div>
+        <div class="title">
+          <div class="eyebrow">Droppr / transfer intake</div>
+          <h1 id="pageTitle">Upload Files</h1>
+          <p id="pageSubtitle">Loading file request…</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="themeBtn" class="btn ghost" type="button" title="Toggle theme">
+          <span class="material-icons">dark_mode</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div class="row">
+          <div class="pill" id="statusPill" role="status" aria-live="polite" aria-atomic="true"><span class="material-icons">hourglass_empty</span><span id="statusText">Loading</span></div>
+          <div class="pill" id="rulesPill" style="display:none"><span class="material-icons">rule</span><span id="rulesText"></span></div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="stateLoading" class="state show">
+          <span class="material-icons">hourglass_top</span>
+          <h2>Loading…</h2>
+          <p>Preparing your upload page.</p>
+        </div>
+
+        <div id="stateNotFound" class="state">
+          <span class="material-icons">link_off</span>
+          <h2>Upload link not available</h2>
+          <p>This file request may be invalid, expired, or disabled.</p>
+        </div>
+
+        <div id="stateLocked" class="state">
+          <span class="material-icons">lock</span>
+          <h2>Password required</h2>
+          <p>Enter the password to upload files.</p>
+
+          <div class="gate" id="passwordGate">
+            <div class="input-row">
+              <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password">
+              <button id="passwordBtn" class="btn primary" type="button"><span class="material-icons">key</span>Unlock</button>
+            </div>
+            <div class="err" id="passwordErr"></div>
+          </div>
+        </div>
+
+        <div id="uploader" class="uploader">
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose files to upload">
+            <span class="material-icons">cloud_upload</span>
+            <div>
+              <div style="font-weight:900; font-size:14px">Drop files here</div>
+              <div class="hint">or click to choose files. Interrupted transfers can continue after you reselect the same files.</div>
+            </div>
+            <button id="chooseBtn" class="btn" type="button"><span class="material-icons">attach_file</span>Choose files</button>
+            <input id="fileInput" type="file" multiple style="display:none">
+          </div>
+
+          <div class="meta">
+            <div class="left">
+              <div class="pill"><span class="material-icons">info</span><span id="selectedText">No files selected</span></div>
+            </div>
+            <div class="right">
+              <button id="uploadBtn" class="btn primary" type="button" disabled><span class="material-icons">upload</span>Start transfer</button>
+              <button id="clearBtn" class="btn ghost" type="button" disabled><span class="material-icons">delete_sweep</span>Clear</button>
+            </div>
+          </div>
+
+          <div id="selectionNotice" class="selection-notice" role="status" aria-live="polite"></div>
+          <div id="fileList" class="filelist"></div>
+
+          <div id="shareBackBox" class="shareback">
+            <div class="hdr">
+              <div style="min-width:0">
+                <div class="ttl">View link</div>
+                <div class="sub" id="shareBackSub">After upload, you can share a read-only link to view/download the uploaded files.</div>
+              </div>
+            </div>
+
+            <div id="shareBackLink" class="mono" style="display:none"></div>
+            <div class="meta" id="shareBackActions" style="display:none; margin-top:10px">
+              <div class="left">
+                <div class="pill"><span class="material-icons">link</span><span id="shareBackMeta">Ready</span></div>
+              </div>
+              <div class="right">
+                <button id="copyShareBackBtn" class="btn" type="button"><span class="material-icons">content_copy</span>Copy link</button>
+                <a id="openShareBackBtn" class="btn ghost" href="#" target="_blank" rel="noopener"><span class="material-icons">open_in_new</span>Open</a>
+              </div>
+            </div>
+            <div class="err" id="shareBackErr"></div>
+          </div>
+
+          <div class="footer-note">
+            Droppr verifies each completed chunk before saving it. Supported devices stay awake during active transfers, and an offline connection pauses automatically until the network returns.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      'use strict';
+
+      var requestId = null;
+      var sessionToken = null;
+      var requestInfo = null;
+      var selectedFiles = [];
+      var fileStates = {};
+      var uploading = false;
+      var wakeLockSentinel = null;
+
+      function $(id){ return document.getElementById(id); }
+
+      function setTheme(next){
+        try{ document.documentElement.setAttribute('data-theme', next); }catch(e){}
+        try{ localStorage.setItem('droppr_upload_theme', next); }catch(e2){}
+        try{ $('themeBtn').querySelector('.material-icons').textContent = next === 'light' ? 'light_mode' : 'dark_mode'; }catch(e3){}
+      }
+
+      function initTheme(){
+        var stored = null;
+        try{ stored = localStorage.getItem('droppr_upload_theme'); }catch(e){}
+        setTheme(stored === 'light' ? 'light' : 'dark');
+      }
+
+      function setPill(kind, icon, text){
+        var pill = $('statusPill');
+        pill.className = 'pill' + (kind ? (' ' + kind) : '');
+        pill.querySelector('.material-icons').textContent = icon;
+        $('statusText').textContent = text;
+      }
+
+      function isOffline(){
+        return navigator.onLine === false;
+      }
+
+      function requestUploadWakeLock(){
+        if (!uploading || document.visibilityState !== 'visible' || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function'){
+          return Promise.resolve(false);
+        }
+        if (wakeLockSentinel) return Promise.resolve(true);
+        return navigator.wakeLock.request('screen').then(function(lock){
+          wakeLockSentinel = lock;
+          try{
+            lock.addEventListener('release', function(){
+              if (wakeLockSentinel === lock) wakeLockSentinel = null;
+            });
+          }catch(e){}
+          return true;
+        }).catch(function(){ return false; });
+      }
+
+      function releaseUploadWakeLock(){
+        var lock = wakeLockSentinel;
+        wakeLockSentinel = null;
+        if (!lock || typeof lock.release !== 'function') return Promise.resolve();
+        try{
+          return Promise.resolve(lock.release()).catch(function(){});
+        }catch(e){ return Promise.resolve(); }
+      }
+
+      function waitUntilOnline(idx){
+        if (!isOffline()) return Promise.resolve();
+        setPill('warn','wifi_off','Waiting for connection');
+        if (typeof idx === 'number') setFileStatus(idx, 'Paused — offline', null);
+        return new Promise(function(resolve){
+          function resumed(){
+            window.removeEventListener('online', resumed);
+            if (uploading) setPill('warn','cloud_upload','Connection restored…');
+            resolve();
+          }
+          window.addEventListener('online', resumed);
+          if (!isOffline()) resumed();
+        });
+      }
+
+      function showState(id){
+        ['stateLoading','stateNotFound','stateLocked'].forEach(function(x){
+          $(x).classList.remove('show');
+        });
+        $(id).classList.add('show');
+      }
+
+      function formatBytes(bytes){
+        var n = Number(bytes || 0);
+        if (!isFinite(n) || n <= 0) return '0 B';
+        var units = ['B','KB','MB','GB','TB'];
+        var i = Math.floor(Math.log(n)/Math.log(1024));
+        i = Math.max(0, Math.min(i, units.length-1));
+        var v = n / Math.pow(1024,i);
+        return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + ' ' + units[i];
+      }
+
+      function supportsChunkChecksums(){
+        return !!(
+          window.crypto && window.crypto.subtle &&
+          window.Blob && (Blob.prototype.arrayBuffer || window.FileReader)
+        );
+      }
+
+      function requestedChecksumAlgorithm(){
+        var supported = requestInfo && requestInfo.resumable_checksum_algorithms || [];
+        return supportsChunkChecksums() && supported.indexOf('sha256') !== -1 ? 'sha256' : '';
+      }
+
+      function blobSha256Hex(blob){
+        var bufferPromise;
+        if (blob && typeof blob.arrayBuffer === 'function'){
+          bufferPromise = blob.arrayBuffer();
+        } else {
+          bufferPromise = new Promise(function(resolve, reject){
+            var reader = new FileReader();
+            reader.onload = function(){ resolve(reader.result); };
+            reader.onerror = function(){ reject(reader.error || new Error('Unable to read upload chunk.')); };
+            reader.readAsArrayBuffer(blob);
+          });
+        }
+        return bufferPromise.then(function(buffer){
+          return window.crypto.subtle.digest('SHA-256', buffer);
+        }).then(function(digest){
+          return Array.prototype.map.call(new Uint8Array(digest), function(value){
+            return value.toString(16).padStart(2, '0');
+          }).join('');
+        });
+      }
+
+      function parseRequestId(){
+        var m = String(window.location.pathname || '').match(/\/upload\/([^\/?#]+)/);
+        requestId = m && m[1] ? m[1] : null;
+      }
+
+      function setRulesPill(info){
+        var allowed = (info && info.allowed_exts && info.allowed_exts.length) ? ('.' + info.allowed_exts.join(', .')) : 'any';
+        var maxBytes = Number(info && info.max_file_size_bytes || 0);
+        var maxText = maxBytes > 0 ? formatBytes(maxBytes) : 'server limit';
+        var chunkBytes = Number(info && info.resumable_chunk_size_bytes || 0);
+        var verified = requestedChecksumAlgorithm() === 'sha256';
+        var resumeText = info && info.resumable ?
+          (' • ' + (chunkBytes ? (formatBytes(chunkBytes) + ' ') : '') + 'resumable chunks' + (verified ? ' • SHA-256 verified' : '')) : '';
+        $('rulesText').textContent = 'Allowed: ' + allowed + ' • Max: ' + maxText + resumeText;
+        $('rulesPill').style.display = 'inline-flex';
+      }
+
+      function escapeHtml(text){
+        var div = document.createElement('div');
+        div.textContent = String(text || '');
+        return div.innerHTML;
+      }
+
+      function fileExt(name){
+        var parts = String(name || '').split('.');
+        if (parts.length < 2) return '';
+        return String(parts.pop() || '').toLowerCase();
+      }
+
+      function fileKey(file){
+        return [String(file && file.name || ''), Number(file && file.size || 0), Number(file && file.lastModified || 0)].join('::');
+      }
+
+      function resumeStorageKey(file){
+        return 'droppr_resumable_upload:' + String(requestId || '') + ':' + fileKey(file);
+      }
+
+      function loadResumeRecord(file){
+        var key = resumeStorageKey(file);
+        try{
+          var value = JSON.parse(localStorage.getItem(key) || 'null');
+          if (value && value.session_id && value.upload_token) return value;
+        }catch(e){}
+        try{ localStorage.removeItem(key); }catch(e2){}
+        return null;
+      }
+
+      function saveResumeRecord(file, record){
+        try{ localStorage.setItem(resumeStorageKey(file), JSON.stringify(record)); }catch(e){}
+      }
+
+      function clearResumeRecord(file){
+        try{ localStorage.removeItem(resumeStorageKey(file)); }catch(e){}
+      }
+
+      function getFileState(file){
+        var key = fileKey(file);
+        var state = fileStates[key];
+        if (!state){
+          state = {
+            text: loadResumeRecord(file) ? 'Resume available' : 'Ready',
+            kind: '',
+            progress: 0,
+            uploaded: false
+          };
+          fileStates[key] = state;
+        }
+        return state;
+      }
+
+      function hasPendingFiles(){
+        return selectedFiles.some(function(file){ return !getFileState(file).uploaded; });
+      }
+
+      function plural(n, word){
+        return String(n) + ' ' + word + (Number(n) === 1 ? '' : 's');
+      }
+
+      function setSelectionNotice(kind, msg){
+        var el = $('selectionNotice');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'selection-notice' + (msg ? ' show' : '') + (kind ? (' ' + kind) : '');
+      }
+
+      function summarizeRejected(rejected){
+        if (!rejected || !rejected.length) return '';
+        var reasons = {};
+        rejected.forEach(function(item){
+          var key = String(item && item.reason || 'skipped');
+          reasons[key] = (reasons[key] || 0) + 1;
+        });
+
+        var parts = [];
+        if (reasons.type) parts.push(plural(reasons.type, 'file') + ' with a blocked type');
+        if (reasons.empty) parts.push(plural(reasons.empty, 'empty file'));
+        if (reasons.duplicate) parts.push(plural(reasons.duplicate, 'duplicate selection'));
+        if (reasons.size) {
+          var maxBytes = Number(requestInfo && requestInfo.max_file_size_bytes || 0);
+          parts.push(plural(reasons.size, 'file') + ' over ' + formatBytes(maxBytes));
+        }
+        if (reasons.count) {
+          var maxFiles = Number(requestInfo && requestInfo.max_files || 0);
+          parts.push(plural(reasons.count, 'file') + ' over the ' + plural(maxFiles, 'file') + ' limit');
+        }
+        if (!parts.length) parts.push(plural(rejected.length, 'file') + ' skipped');
+        return 'Skipped ' + plural(rejected.length, 'file') + ': ' + parts.join(', ') + '.';
+      }
+
+      function renderFileList(){
+        var list = $('fileList');
+        if (!selectedFiles.length){
+          list.innerHTML = '';
+          $('selectedText').textContent = 'No files selected';
+          $('uploadBtn').disabled = true;
+          $('clearBtn').disabled = true;
+          return;
+        }
+
+        var total = 0;
+        selectedFiles.forEach(function(f){ total += Number(f.size || 0); });
+        $('selectedText').textContent = selectedFiles.length + ' file' + (selectedFiles.length !== 1 ? 's' : '') + ' • ' + formatBytes(total);
+        $('uploadBtn').disabled = uploading || !hasPendingFiles();
+        $('clearBtn').disabled = uploading;
+
+        var html = '';
+        selectedFiles.forEach(function(f, idx){
+          var state = getFileState(f);
+          var rowKind = state.kind ? (' ' + state.kind) : '';
+          html += '<div class="file' + rowKind + '" id="f_' + idx + '">' +
+            '<div class="main">' +
+              '<div class="name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+              '<div class="sub">' + formatBytes(f.size) + (requestInfo && requestInfo.resumable ? (requestedChecksumAlgorithm() ? ' • SHA-256 verified chunks' : ' • resumable chunks') : '') + '</div>' +
+              '<div class="prog"><div class="fill" id="fill_' + idx + '" style="width:' + (Math.max(0, Math.min(1, Number(state.progress || 0))) * 100).toFixed(1) + '%"></div></div>' +
+            '</div>' +
+            '<div class="file-actions-inline">' +
+              '<button class="remove-file" type="button" title="Remove file" aria-label="Remove ' + escapeHtml(f.name) + '" data-remove-file="' + idx + '"' + (uploading ? ' disabled' : '') + '>' +
+                '<span class="material-icons">close</span>' +
+              '</button>' +
+              '<div class="status" id="st_' + idx + '">' + escapeHtml(state.text || 'Ready') + '</div>' +
+            '</div>' +
+          '</div>';
+        });
+        list.innerHTML = html;
+      }
+
+      function setFileStatus(idx, text, kind){
+        var file = selectedFiles[idx];
+        if (file){
+          var state = getFileState(file);
+          state.text = String(text || '');
+          state.kind = kind || '';
+          if (kind === 'ok') state.uploaded = true;
+        }
+        var row = $('f_' + idx);
+        var st = $('st_' + idx);
+        if (!row || !st) return;
+        st.textContent = text;
+        row.classList.remove('ok','bad');
+        if (kind) row.classList.add(kind);
+      }
+
+      function setFileProgress(idx, pct){
+        var file = selectedFiles[idx];
+        if (file) getFileState(file).progress = Math.max(0, Math.min(1, Number(pct || 0)));
+        var fill = $('fill_' + idx);
+        if (!fill) return;
+        var p = Math.max(0, Math.min(1, Number(pct || 0)));
+        fill.style.width = (p * 100).toFixed(1) + '%';
+      }
+
+      function normalizeSelectedFiles(files){
+        var list = [];
+        var rejected = [];
+        var maxFiles = Number(requestInfo && requestInfo.max_files || 0);
+        var maxBytes = Number(requestInfo && requestInfo.max_file_size_bytes || 0);
+        var remaining = maxFiles > 0 ? Math.max(0, maxFiles - selectedFiles.length) : Infinity;
+        var allowed = null;
+
+        if (requestInfo && requestInfo.allowed_exts && requestInfo.allowed_exts.length){
+          allowed = {};
+          requestInfo.allowed_exts.forEach(function(e){ allowed[String(e||'').toLowerCase()] = true; });
+        }
+
+        for (var i=0;i<files.length;i++){
+          var f = files[i];
+          if (!f) continue;
+
+          if (Number(f.size || 0) <= 0){
+            rejected.push({ file: f, reason: 'empty' });
+            continue;
+          }
+
+          if (selectedFiles.some(function(existing){ return fileKey(existing) === fileKey(f); }) ||
+              list.some(function(existing){ return fileKey(existing) === fileKey(f); })){
+            rejected.push({ file: f, reason: 'duplicate' });
+            continue;
+          }
+
+          if (allowed && allowed[fileExt(f.name)] !== true){
+            rejected.push({ file: f, reason: 'type' });
+            continue;
+          }
+
+          if (maxBytes > 0 && Number(f.size || 0) > maxBytes){
+            rejected.push({ file: f, reason: 'size' });
+            continue;
+          }
+
+          if (remaining <= 0){
+            rejected.push({ file: f, reason: 'count' });
+            continue;
+          }
+
+          list.push(f);
+          if (remaining !== Infinity) remaining -= 1;
+        }
+
+        return { accepted: list, rejected: rejected };
+      }
+
+      function onFilesChosen(fileList){
+        if (uploading) return;
+        var normalized = normalizeSelectedFiles(fileList || []);
+        selectedFiles = selectedFiles.concat(normalized.accepted);
+        if (normalized.rejected.length){
+          setSelectionNotice('bad', summarizeRejected(normalized.rejected));
+        } else {
+          setSelectionNotice('', '');
+        }
+        renderFileList();
+      }
+
+      function clearFiles(){
+        if (uploading) return;
+        selectedFiles = [];
+        fileStates = {};
+        try{ $('fileInput').value = ''; }catch(e){}
+        setSelectionNotice('', '');
+        renderFileList();
+      }
+
+      function removeFile(idx){
+        if (uploading) return;
+        var n = Number(idx);
+        if (!isFinite(n) || n < 0 || n >= selectedFiles.length) return;
+        delete fileStates[fileKey(selectedFiles[n])];
+        selectedFiles.splice(n, 1);
+        setSelectionNotice('', '');
+        renderFileList();
+      }
+
+      function uploadOneLegacy(idx, file){
+        return new Promise(function(resolve, reject){
+          var xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload-request/' + encodeURIComponent(requestId) + '/upload', true);
+          xhr.responseType = 'json';
+          if (sessionToken){
+            try{ xhr.setRequestHeader('X-Session-Token', sessionToken); }catch(e){}
+          }
+
+          xhr.upload.onprogress = function(e){
+            if (e && e.lengthComputable){
+              setFileProgress(idx, e.loaded / e.total);
+              setFileStatus(idx, Math.floor((e.loaded / e.total) * 100) + '%', null);
+            } else {
+              setFileStatus(idx, 'Uploading…', null);
+            }
+          };
+
+          xhr.onreadystatechange = function(){
+            if (xhr.readyState !== 4) return;
+            if (xhr.status >= 200 && xhr.status < 300){
+              setFileProgress(idx, 1);
+              setFileStatus(idx, 'Uploaded', 'ok');
+              resolve(xhr.response || {});
+              return;
+            }
+
+            if (xhr.status === 401){
+              setFileStatus(idx, 'Locked', 'bad');
+              reject({ code: 401, message: 'Password required' });
+              return;
+            }
+
+            var msg = 'Upload failed';
+            try{
+              if (xhr.response && xhr.response.error) msg = String(xhr.response.error);
+              else if (xhr.responseText) msg = String(xhr.responseText);
+            }catch(e2){}
+            setFileStatus(idx, 'Failed', 'bad');
+            reject({ code: xhr.status, message: msg });
+          };
+
+          var fd = new FormData();
+          fd.append('files', file, file.name);
+          try{
+            xhr.send(fd);
+          } catch (e3){
+            reject({ code: 0, message: 'Upload failed to start' });
+          }
+        });
+      }
+
+      function apiJson(url, options){
+        return fetch(url, options || {}).then(function(resp){
+          return resp.text().then(function(text){
+            var data = {};
+            try{ data = JSON.parse(text || '{}'); }catch(e){}
+            if (!resp.ok){
+              var err = new Error((data && data.error) ? String(data.error) : (text || ('HTTP ' + resp.status)));
+              err.code = resp.status;
+              throw err;
+            }
+            return data;
+          });
+        }).catch(function(err){
+          if (typeof err.code !== 'number') err.code = 0;
+          throw err;
+        });
+      }
+
+      function resumableHeaders(uploadToken){
+        return {
+          'X-Upload-Token': String(uploadToken || ''),
+          'Cache-Control': 'no-store'
+        };
+      }
+
+      function getResumableSession(record){
+        return apiJson(
+          '/api/upload-request/' + encodeURIComponent(requestId) + '/session/' + encodeURIComponent(record.session_id),
+          { method:'GET', headers:resumableHeaders(record.upload_token), cache:'no-store' }
+        );
+      }
+
+      function createResumableSession(file){
+        var headers = { 'Content-Type':'application/json' };
+        if (sessionToken) headers['X-Session-Token'] = sessionToken;
+        return apiJson('/api/upload-request/' + encodeURIComponent(requestId) + '/session', {
+          method:'POST',
+          headers:headers,
+          body:JSON.stringify({
+            filename:file.name,
+            size:Number(file.size || 0),
+            last_modified:Number(file.lastModified || 0),
+            content_type:String(file.type || ''),
+            checksum_algorithm:requestedChecksumAlgorithm()
+          })
+        }).then(function(data){
+          var record = {
+            session_id:String(data.session_id || ''),
+            upload_token:String(data.upload_token || '')
+          };
+          if (!record.session_id || !record.upload_token){
+            var err = new Error('Server did not return a resumable upload session.');
+            err.code = 500;
+            throw err;
+          }
+          saveResumeRecord(file, record);
+          return { record:record, status:data.status || {} };
+        });
+      }
+
+      function ensureResumableSession(file){
+        var existing = loadResumeRecord(file);
+        if (!existing) return createResumableSession(file);
+        return getResumableSession(existing).then(function(data){
+          var status = data && data.status ? data.status : {};
+          if (String(status.filename || '') !== String(file.name || '') || Number(status.size || 0) !== Number(file.size || 0)){
+            clearResumeRecord(file);
+            return createResumableSession(file);
+          }
+          return { record:existing, status:status };
+        }).catch(function(err){
+          if (err && (err.code === 403 || err.code === 404)){
+            clearResumeRecord(file);
+            return createResumableSession(file);
+          }
+          if (err && !err.code && isOffline()){
+            return waitUntilOnline().then(function(){ return ensureResumableSession(file); });
+          }
+          throw err;
+        });
+      }
+
+      function putResumableChunk(idx, file, session, chunkIndex, confirmedBytes){
+        var chunkSize = Number(session.status.chunk_size || 0);
+        var startByte = chunkIndex * chunkSize;
+        var endByte = Math.min(Number(file.size || 0), startByte + chunkSize);
+        var blob = file.slice(startByte, endByte);
+        var checksumRequired = String(session.status.checksum_algorithm || '') === 'sha256';
+        var checksumPromise = Promise.resolve('');
+        if (checksumRequired){
+          setFileStatus(idx, 'Verifying chunk ' + (chunkIndex + 1) + '/' + Number(session.status.chunk_count || 0), null);
+          checksumPromise = blobSha256Hex(blob);
+        }
+
+        return checksumPromise.then(function(checksum){
+          return new Promise(function(resolve, reject){
+          var xhr = new XMLHttpRequest();
+          xhr.open(
+            'PUT',
+            '/api/upload-request/' + encodeURIComponent(requestId) + '/session/' + encodeURIComponent(session.record.session_id) + '/chunk/' + chunkIndex,
+            true
+          );
+          xhr.responseType = 'json';
+          xhr.setRequestHeader('X-Upload-Token', session.record.upload_token);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.setRequestHeader('X-Chunk-Size', String(blob.size));
+          if (checksum) xhr.setRequestHeader('X-Chunk-SHA256', checksum);
+
+          xhr.upload.onprogress = function(e){
+            if (!e || !e.lengthComputable) return;
+            var current = Math.min(Number(file.size || 0), Number(confirmedBytes || 0) + Number(e.loaded || 0));
+            setFileProgress(idx, current / Number(file.size || 1));
+            setFileStatus(idx, Math.floor((current / Number(file.size || 1)) * 100) + '%', null);
+          };
+
+          xhr.onreadystatechange = function(){
+            if (xhr.readyState !== 4) return;
+            var data = xhr.response || {};
+            if (xhr.status >= 200 && xhr.status < 300){
+              resolve(data);
+              return;
+            }
+            var message = (data && data.error) ? String(data.error) : (xhr.responseText || ('HTTP ' + xhr.status));
+            var err = new Error(message);
+            err.code = xhr.status;
+            reject(err);
+          };
+          xhr.onerror = function(){
+            var err = new Error('Network connection interrupted.');
+            err.code = 0;
+            reject(err);
+          };
+          try{ xhr.send(blob); }catch(e){ e.code = 0; reject(e); }
+          });
+        });
+      }
+
+      function putResumableChunkWithRetry(idx, file, session, chunkIndex, confirmedBytes, attempt){
+        var currentAttempt = Number(attempt || 1);
+        return putResumableChunk(idx, file, session, chunkIndex, confirmedBytes).catch(function(err){
+          if (err && !err.code && isOffline()){
+            return waitUntilOnline(idx).then(function(){
+              return putResumableChunkWithRetry(idx, file, session, chunkIndex, confirmedBytes, currentAttempt);
+            });
+          }
+          var retryable = !err.code || err.code === 408 || err.code === 422 || err.code === 429 || err.code >= 500;
+          if (!retryable || currentAttempt >= 5) throw err;
+          setFileStatus(idx, 'Retry ' + currentAttempt + '/5', null);
+          return new Promise(function(resolve){ setTimeout(resolve, currentAttempt * 1500); }).then(function(){
+            return putResumableChunkWithRetry(idx, file, session, chunkIndex, confirmedBytes, currentAttempt + 1);
+          });
+        });
+      }
+
+      function commitResumableWithNetworkRecovery(idx, session){
+        var url = '/api/upload-request/' + encodeURIComponent(requestId) + '/session/' + encodeURIComponent(session.record.session_id) + '/commit';
+        var options = { method:'POST', headers:resumableHeaders(session.record.upload_token) };
+        return waitUntilOnline(idx).then(function(){
+          return apiJson(url, options);
+        }).catch(function(err){
+          if (err && !err.code && isOffline()){
+            return waitUntilOnline(idx).then(function(){
+              return commitResumableWithNetworkRecovery(idx, session);
+            });
+          }
+          throw err;
+        });
+      }
+
+      async function uploadOne(idx, file){
+        if (!requestInfo || !requestInfo.resumable) return uploadOneLegacy(idx, file);
+
+        await waitUntilOnline(idx);
+        var session = await ensureResumableSession(file);
+        var status = session.status || {};
+        if (status.committed){
+          clearResumeRecord(file);
+          setFileProgress(idx, 1);
+          setFileStatus(idx, 'Uploaded', 'ok');
+          return { ok:true, uploaded:{ original_name:file.name, stored_name:status.stored_name, size_bytes:file.size } };
+        }
+
+        var received = {};
+        (status.received || []).forEach(function(value){ received[Number(value)] = true; });
+        var confirmedBytes = Number(status.bytes_received || 0);
+        setFileProgress(idx, confirmedBytes / Number(file.size || 1));
+        if (confirmedBytes > 0) setFileStatus(idx, 'Resuming ' + Math.floor((confirmedBytes / Number(file.size || 1)) * 100) + '%', null);
+
+        var chunkCount = Number(status.chunk_count || 0);
+        var chunkSize = Number(status.chunk_size || 0);
+        if (!chunkCount || !chunkSize){
+          var invalid = new Error('Invalid resumable upload session.');
+          invalid.code = 500;
+          throw invalid;
+        }
+
+        for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++){
+          if (received[chunkIndex]) continue;
+          await waitUntilOnline(idx);
+          setFileStatus(idx, 'Chunk ' + (chunkIndex + 1) + '/' + chunkCount, null);
+          var chunkResult = await putResumableChunkWithRetry(idx, file, session, chunkIndex, confirmedBytes, 1);
+          confirmedBytes = Number(chunkResult && chunkResult.status && chunkResult.status.bytes_received ||
+            Math.min(Number(file.size || 0), confirmedBytes + Math.min(chunkSize, Number(file.size || 0) - (chunkIndex * chunkSize))));
+          received[chunkIndex] = true;
+          setFileProgress(idx, confirmedBytes / Number(file.size || 1));
+        }
+
+        setFileStatus(idx, 'Saving…', null);
+        var committed = await commitResumableWithNetworkRecovery(idx, session);
+        clearResumeRecord(file);
+        setFileProgress(idx, 1);
+        setFileStatus(idx, 'Uploaded', 'ok');
+        return committed;
+      }
+
+      function disableInputs(disabled){
+        $('uploadBtn').disabled = disabled || !selectedFiles.length || !hasPendingFiles();
+        $('clearBtn').disabled = disabled || !selectedFiles.length;
+        $('chooseBtn').disabled = disabled;
+        $('fileInput').disabled = disabled;
+      }
+
+      function setShareBackError(msg){
+        var el = $('shareBackErr');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+      }
+
+      function showShareBackBox(){
+        try{ $('shareBackBox').classList.add('show'); }catch(e){}
+      }
+
+      function copyText(text){
+        var value = String(text || '');
+        if (!value) return Promise.reject(new Error('empty'));
+        if (navigator.clipboard && navigator.clipboard.writeText){
+          return navigator.clipboard.writeText(value);
+        }
+        return new Promise(function(resolve, reject){
+          var ta = document.createElement('textarea');
+          ta.value = value;
+          ta.setAttribute('readonly','readonly');
+          ta.style.position='fixed';
+          ta.style.left='-9999px';
+          document.body.appendChild(ta);
+          try{
+            ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (ok) resolve(); else reject(new Error('copy failed'));
+          }catch(e){
+            try{ document.body.removeChild(ta); }catch(e2){}
+            reject(e);
+          }
+        });
+      }
+
+      function maybeCreateShareBack(){
+        if (!requestInfo || !requestInfo.share_back_enabled) return Promise.resolve();
+        showShareBackBox();
+        setShareBackError('');
+        $('shareBackSub').textContent = 'Generating view link…';
+        $('shareBackLink').style.display = 'none';
+        $('shareBackActions').style.display = 'none';
+
+        var headers = {};
+        if (sessionToken){
+          try{ headers['X-Session-Token'] = sessionToken; }catch(e){}
+        }
+
+        return fetch('/api/upload-request/' + encodeURIComponent(requestId) + '/share-back', {
+          method: 'POST',
+          headers: headers
+        }).then(function(resp){
+          return resp.text().then(function(text){
+            var data = {};
+            try{ data = JSON.parse(text || '{}'); }catch(e){}
+            if (!resp.ok){
+              var msg = (data && data.error) ? String(data.error) : (text || ('HTTP ' + resp.status));
+              throw new Error(msg);
+            }
+            return data;
+          });
+        }).then(function(data){
+          if (!data || !data.share_url) throw new Error('Failed to generate link');
+          var full = window.location.origin + data.share_url;
+          $('shareBackSub').textContent = 'Share this link to view/download the uploaded files.';
+          $('shareBackLink').textContent = full;
+          $('shareBackLink').style.display = 'block';
+          $('shareBackMeta').textContent = 'Link created';
+          $('openShareBackBtn').href = data.share_url;
+          $('shareBackActions').style.display = 'flex';
+
+          // Best-effort auto-copy.
+          copyText(full).then(function(){
+            $('shareBackMeta').textContent = 'Link copied';
+            setTimeout(function(){ $('shareBackMeta').textContent = 'Link created'; }, 1200);
+          }).catch(function(){});
+        }).catch(function(err){
+          $('shareBackSub').textContent = 'View link unavailable.';
+          setShareBackError(String(err && err.message ? err.message : err));
+        });
+      }
+
+      function startUpload(){
+        if (uploading) return;
+        if (!selectedFiles.length || !hasPendingFiles()) return;
+        uploading = true;
+        disableInputs(true);
+        setPill('warn','cloud_upload','Resumable upload…');
+        requestUploadWakeLock();
+
+        var chain = Promise.resolve();
+        var completedNow = 0;
+        var failedNow = 0;
+        var authError = null;
+        selectedFiles.forEach(function(file, idx){
+          if (getFileState(file).uploaded) return;
+          chain = chain.then(function(){
+            setFileStatus(idx, 'Starting…', null);
+            return uploadOne(idx, file).then(function(result){
+              completedNow += 1;
+              return result;
+            }).catch(function(err){
+              if (err && err.code === 401){
+                authError = err;
+                throw err;
+              }
+              failedNow += 1;
+              setFileStatus(idx, 'Needs retry', 'bad');
+              return null;
+            });
+          });
+        });
+
+        chain.then(function(){
+          if (failedNow){
+            setPill('warn','sync_problem', completedNow + ' complete • ' + failedNow + ' retry');
+          } else {
+            setPill('good','check_circle','Upload complete');
+          }
+          return completedNow > 0 ? maybeCreateShareBack() : null;
+        }).catch(function(err){
+          if (authError || (err && err.code === 401)){
+            // token expired / not provided
+            setPill('bad','lock','Password required');
+            showLocked();
+            return;
+          }
+          setPill('bad','error','Upload failed');
+        }).finally(function(){
+          uploading = false;
+          releaseUploadWakeLock();
+          disableInputs(false);
+        });
+      }
+
+      function showUploader(){
+        $('uploader').classList.add('show');
+        $('stateLoading').classList.remove('show');
+        $('stateNotFound').classList.remove('show');
+        $('stateLocked').classList.remove('show');
+        setShareBackError('');
+        try{ $('shareBackBox').classList.remove('show'); }catch(e){}
+      }
+
+      function showLocked(){
+        $('uploader').classList.remove('show');
+        showState('stateLocked');
+        $('passwordGate').style.display = 'block';
+        try{ $('passwordInput').focus(); }catch(e){}
+      }
+
+      function showNotFound(){
+        $('uploader').classList.remove('show');
+        showState('stateNotFound');
+      }
+
+      function verifyPassword(){
+        var pw = String($('passwordInput').value || '');
+        $('passwordErr').style.display = 'none';
+
+        if (!pw){
+          $('passwordErr').textContent = 'Please enter a password.';
+          $('passwordErr').style.display = 'block';
+          return;
+        }
+
+        $('passwordBtn').disabled = true;
+        $('passwordBtn').innerHTML = '<span class="material-icons">hourglass_top</span>Checking…';
+
+        fetch('/api/upload-request/' + encodeURIComponent(requestId) + '/verify', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ password: pw })
+        }).then(function(resp){
+          return resp.text().then(function(text){
+            var data = {};
+            try{ data = JSON.parse(text || '{}'); }catch(e){}
+            if (!resp.ok){
+              var msg = data && data.error ? String(data.error) : (text || 'Invalid password');
+              throw new Error(msg);
+            }
+            return data;
+          });
+        }).then(function(data){
+          if (data && data.valid){
+            sessionToken = data.token || null;
+            setPill('good','lock_open','Unlocked');
+            showUploader();
+            renderFileList();
+          } else {
+            throw new Error((data && data.error) ? String(data.error) : 'Invalid password');
+          }
+        }).catch(function(err){
+          $('passwordErr').textContent = String(err && err.message ? err.message : err);
+          $('passwordErr').style.display = 'block';
+          setPill('bad','lock','Locked');
+        }).finally(function(){
+          $('passwordBtn').disabled = false;
+          $('passwordBtn').innerHTML = '<span class="material-icons">key</span>Unlock';
+        });
+      }
+
+      function loadInfo(){
+        setPill('', 'hourglass_empty', 'Loading');
+        showState('stateLoading');
+
+        return fetch('/api/upload-request/' + encodeURIComponent(requestId) + '/info', { method:'GET' })
+          .then(function(resp){
+            if (resp.status === 404 || resp.status === 410) return null;
+            return resp.text().then(function(text){
+              if (!resp.ok) return null;
+              try{ return JSON.parse(text || '{}'); }catch(e){ return null; }
+            });
+          })
+          .then(function(info){
+            requestInfo = info;
+            if (!info){
+              setPill('bad','link_off','Unavailable');
+              showNotFound();
+              return;
+            }
+
+            var title = info.title || 'Upload files';
+            $('pageTitle').textContent = title;
+            document.title = title;
+
+            var exp = Number(info.expires_at || 0);
+            var expText = exp ? ('Expires: ' + new Date(exp * 1000).toLocaleString()) : 'No expiry';
+            $('pageSubtitle').textContent = expText;
+
+            setRulesPill(info);
+
+            if (info.password_protected){
+              setPill('warn','lock','Locked');
+              showLocked();
+            } else {
+              setPill('good','cloud_upload','Ready');
+              showUploader();
+              renderFileList();
+            }
+          });
+      }
+
+      function boot(){
+        initTheme();
+        parseRequestId();
+        if (!requestId){
+          setPill('bad','link_off','Invalid link');
+          showNotFound();
+          return;
+        }
+
+        $('themeBtn').addEventListener('click', function(){
+          var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+          setTheme(cur === 'light' ? 'dark' : 'light');
+        });
+
+        window.addEventListener('offline', function(){
+          if (uploading) setPill('warn','wifi_off','Waiting for connection');
+          else if (requestInfo) setPill('warn','wifi_off','Offline');
+        });
+        window.addEventListener('online', function(){
+          if (!uploading && requestInfo && !requestInfo.password_protected){
+            setPill('good','cloud_upload','Ready');
+          }
+        });
+        document.addEventListener('visibilitychange', function(){
+          if (!uploading) return;
+          if (document.visibilityState === 'visible') requestUploadWakeLock();
+          else releaseUploadWakeLock();
+        });
+
+        $('passwordBtn').addEventListener('click', verifyPassword);
+        $('passwordInput').addEventListener('keydown', function(e){
+          if (e && e.key === 'Enter') verifyPassword();
+        });
+
+        $('chooseBtn').addEventListener('click', function(e){
+          if (e) e.stopPropagation();
+          $('fileInput').click();
+        });
+        $('fileInput').addEventListener('change', function(){
+          onFilesChosen(this.files);
+          try{ this.value = ''; }catch(e){}
+        });
+
+        $('uploadBtn').addEventListener('click', startUpload);
+        $('clearBtn').addEventListener('click', clearFiles);
+        $('copyShareBackBtn').addEventListener('click', function(){
+          var txt = $('shareBackLink').textContent || '';
+          if (!txt) return;
+          copyText(txt).then(function(){
+            $('shareBackMeta').textContent = 'Link copied';
+            setTimeout(function(){ $('shareBackMeta').textContent = 'Link created'; }, 1200);
+          }).catch(function(){});
+        });
+
+        var dz = $('dropzone');
+        dz.addEventListener('click', function(){ $('fileInput').click(); });
+        dz.addEventListener('keydown', function(e){
+          if (!e) return;
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){
+            e.preventDefault();
+            $('fileInput').click();
+          }
+        });
+        dz.addEventListener('dragenter', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+        dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+        dz.addEventListener('dragleave', function(e){ e.preventDefault(); dz.classList.remove('drag'); });
+        dz.addEventListener('drop', function(e){
+          e.preventDefault();
+          dz.classList.remove('drag');
+          if (e.dataTransfer && e.dataTransfer.files) onFilesChosen(e.dataTransfer.files);
+        });
+        $('fileList').addEventListener('click', function(e){
+          var target = e && e.target;
+          var btn = target && target.closest ? target.closest('[data-remove-file]') : null;
+          if (!btn) return;
+          e.preventDefault();
+          removeFile(btn.getAttribute('data-remove-file'));
+        });
+
+        loadInfo();
+      }
+
+      boot();
+    })();
+  </script>
+</body>
+</html>

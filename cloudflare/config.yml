@@ -1,9 +1,4 @@
-# Cloudflare Tunnel Configuration - DROPPR ONLY
-#
-# Run ./setup-cloudflare-tunnel.sh to create a dedicated tunnel and write the
-# correct tunnel ID + credentials file.
-
-tunnel: TUNNEL_ID
+tunnel: f776bf48-0d24-4520-b785-a03795c75e7e
 credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
 

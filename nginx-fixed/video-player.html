@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Video Player</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
         html, body { height: 100%; }
@@ -71,9 +72,15 @@
             cursor: pointer;
             font-weight: 600;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
         }
 
         .btn:active { transform: translateY(1px); }
+        .btn:hover { background: rgba(255,255,255,0.14); }
+        .btn .material-icons { font-size: 1.1rem; line-height: 1; }
 
         .actions {
             display: flex;
@@ -84,6 +91,7 @@
         @media (max-width: 600px) {
             .actions .btn.secondary { display: none; }
             .title .name, .title .sub { max-width: 50vw; }
+            .btn { padding: 0.55rem 0.7rem; }
         }
 
 	        .player {
@@ -165,22 +173,46 @@
         .error.show { display: flex; }
         .error h2 { margin: 0 0 0.5rem; }
         .error p { margin: 0.25rem 0; opacity: 0.85; }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+            transform: translateX(-50%) translateY(14px);
+            z-index: 30;
+            padding: 0.65rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(0,0,0,0.78);
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.16s ease, transform 0.16s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 <body>
     <div class="topbar">
         <div class="left">
-            <a id="backLink" class="btn" href="/gallery/" onclick="this.href='/gallery/'+(new URLSearchParams(location.search).get('share')||'')">← Back</a>
+            <a id="backLink" class="btn" href="/gallery/" onclick="this.href='/gallery/'+(new URLSearchParams(location.search).get('share')||'')"><span class="material-icons">arrow_back</span><span>Back</span></a>
             <div class="title">
                 <div id="fileName" class="name">Video</div>
                 <div id="fileSub" class="sub"></div>
             </div>
         </div>
         <div class="actions">
-            <a id="downloadLink" class="btn secondary" href="#" download>⬇ Download</a>
-            <a id="openLink" class="btn secondary" href="#" target="_blank" rel="noopener">↗ Open</a>
+            <a id="downloadLink" class="btn secondary" href="#" download><span class="material-icons">download</span><span>Download</span></a>
+            <a id="openLink" class="btn secondary" href="#" target="_blank" rel="noopener"><span class="material-icons">open_in_new</span><span>Open</span></a>
+            <button id="copyLinkBtn" class="btn secondary" type="button"><span class="material-icons">content_copy</span><span>Copy</span></button>
             <button id="qualityBtn" class="btn" type="button" title="Quality mode">Auto</button>
-            <button id="reloadBtn" class="btn" type="button">⟳ Reload</button>
+            <button id="reloadBtn" class="btn" type="button"><span class="material-icons">refresh</span><span>Reload</span></button>
         </div>
     </div>
 
@@ -202,6 +234,7 @@
 	            <p id="errorMessage">Please go back and try again.</p>
         </div>
     </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script>
     (function () {
@@ -226,6 +259,42 @@
             document.getElementById('errorTitle').textContent = title || 'Error';
             document.getElementById('errorMessage').textContent = message || '';
             document.getElementById('error').classList.add('show');
+        }
+
+        function showToast(message) {
+            const el = document.getElementById('toast');
+            if (!el) return;
+            el.textContent = message || '';
+            el.classList.toggle('show', Boolean(message));
+            if (message) {
+                clearTimeout(showToast._timer);
+                showToast._timer = setTimeout(() => el.classList.remove('show'), 1600);
+            }
+        }
+
+        function copyText(text) {
+            const value = String(text || '');
+            if (!value) return Promise.reject(new Error('empty'));
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(value);
+            }
+            return new Promise((resolve, reject) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = value;
+                textarea.setAttribute('readonly', '');
+                textarea.style.cssText = 'position:fixed;left:-9999px;top:0;font-size:16px;';
+                document.body.appendChild(textarea);
+                try {
+                    textarea.focus();
+                    textarea.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    ok ? resolve() : reject(new Error('copy failed'));
+                } catch (e) {
+                    try { document.body.removeChild(textarea); } catch (e2) {}
+                    reject(e);
+                }
+            });
         }
 
         const params = new URLSearchParams(window.location.search);
@@ -253,6 +322,7 @@
         const originalInlineUrlDefault = `/api/public/dl/${share}/${encodePath(safeFile)}?inline=true`;
         const downloadUrl = `/api/share/${share}/file/${encodePath(safeFile)}?download=1`;
         const backUrl = `/gallery/${share}`;
+        const playerUrl = `${window.location.origin}/player?share=${encodeURIComponent(share)}&file=${encodeURIComponent(safeFile)}`;
 
         const video = document.getElementById('video');
         const bufferText = document.getElementById('bufferText');
@@ -261,6 +331,7 @@
         const backLink = document.getElementById('backLink');
         const downloadLink = document.getElementById('downloadLink');
         const openLink = document.getElementById('openLink');
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
         const qualityBtn = document.getElementById('qualityBtn');
         const reloadBtn = document.getElementById('reloadBtn');
 
@@ -895,6 +966,12 @@
 
         qualityBtn.onclick = () => cycleQualityMode();
 
+        copyLinkBtn.onclick = () => {
+            copyText(playerUrl)
+                .then(() => showToast('Player link copied'))
+                .catch(() => showToast('Copy failed'));
+        };
+
         reloadBtn.onclick = () => {
             const t = video.currentTime;
             const shouldPlay = !video.paused;
@@ -932,6 +1009,23 @@
             clearHdStableTimer();
             if (qualityMode === 'auto' && activeSource === 'hd') return;
             showError('Could not load video', 'Try Reload. If it keeps failing, go back to the gallery.');
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.defaultPrevented) return;
+            const target = event.target;
+            if (target && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/i.test(target.tagName || '')) return;
+
+            if (event.key === 'q' || event.key === 'Q') {
+                event.preventDefault();
+                cycleQualityMode();
+            } else if (event.key === 'r' || event.key === 'R') {
+                event.preventDefault();
+                reloadBtn.click();
+            } else if (event.key === 'c' || event.key === 'C') {
+                event.preventDefault();
+                copyLinkBtn.click();
+            }
         });
 
         window.addEventListener('beforeunload', () => stopStatusTimer());

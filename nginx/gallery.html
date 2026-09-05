@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Shared Media Gallery</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         /* Dark Theme (default) */
         :root {
@@ -101,6 +102,11 @@
             text-align: center;
         }
 
+        .gallery-summary {
+            min-height: 1.35em;
+            word-break: break-word;
+        }
+
         /* Controls Bar */
         .controls-bar {
             background: rgba(255, 255, 255, 0.06);
@@ -145,6 +151,7 @@
             top: 50%;
             transform: translateY(-50%);
             opacity: 0.5;
+            pointer-events: none;
         }
 
         .filter-group {
@@ -210,6 +217,13 @@
             gap: 0.5rem;
             transition: all 0.2s;
             text-decoration: none;
+        }
+
+        .action-btn .material-icons,
+        .theme-toggle .material-icons,
+        .layout-toggle .material-icons {
+            font-size: 1.15rem;
+            line-height: 1;
         }
 
         .action-btn:hover {
@@ -848,6 +862,9 @@
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .layout-toggle button.active {
@@ -1130,11 +1147,11 @@
 
     <div class="header">
         <h1>Shared Media Gallery</h1>
-        <p>Viewing files shared via Droppr</p>
+        <p id="gallerySummary" class="gallery-summary">Loading share...</p>
 
         <div class="controls-bar">
             <div class="search-box">
-                <span class="search-icon" aria-hidden="true">🔍</span>
+                <span class="material-icons search-icon" aria-hidden="true">search</span>
                 <input type="text" id="searchInput" placeholder="Search files..." aria-label="Search files">
             </div>
 
@@ -1154,17 +1171,17 @@
             </select>
 
             <div class="layout-toggle" id="layoutToggle" role="group" aria-label="Layout options">
-                <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view">▦</button>
-                <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
+                <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view"><span class="material-icons">grid_view</span></button>
+                <button id="listViewBtn" title="List view" aria-label="List view"><span class="material-icons">view_list</span></button>
             </div>
 
-            <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme">🌙</button>
+            <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme"><span class="material-icons">dark_mode</span></button>
 
-            <button class="action-btn secondary" id="detailsBtn" title="Toggle video details">ℹ Details</button>
-            <button class="action-btn secondary" id="copyLinkBtn">🔗 Share</button>
-            <button class="action-btn secondary" id="streamBtn" title="Open Stream Gallery (optimized video player)">▶ Stream</button>
-            <button class="action-btn secondary" id="refreshBtn" title="Refresh. Shift+click = hard reload">🔄 Refresh</button>
-            <a href="#" id="downloadAllBtn" class="action-btn">⬇️ Download All</a>
+            <button class="action-btn secondary" id="detailsBtn" title="Toggle video details"><span class="material-icons">info</span><span>Details</span></button>
+            <button class="action-btn secondary" id="copyLinkBtn"><span class="material-icons">content_copy</span><span>Share</span></button>
+            <button class="action-btn secondary" id="streamBtn" title="Open Stream Gallery (optimized video player)"><span class="material-icons">play_circle</span><span>Stream</span></button>
+            <button class="action-btn secondary" id="refreshBtn" title="Refresh. Shift+click = hard reload"><span class="material-icons">refresh</span><span>Refresh</span></button>
+            <a href="#" id="downloadAllBtn" class="action-btn"><span class="material-icons">archive</span><span>Download All</span></a>
         </div>
     </div>
 
@@ -1308,6 +1325,7 @@
             els.errorTitle = document.getElementById('errorTitle');
             els.errorMessage = document.getElementById('errorMessage');
             els.search = document.getElementById('searchInput');
+            els.gallerySummary = document.getElementById('gallerySummary');
             els.sort = document.getElementById('sortSelect');
             els.filters = document.querySelectorAll('.filter-btn');
             els.modal = document.getElementById('modal');
@@ -1356,7 +1374,8 @@
             const isDark = theme === 'dark';
             document.documentElement.setAttribute('data-theme', theme);
             if (els.themeToggle) {
-                els.themeToggle.textContent = isDark ? '🌙' : '☀️';
+                const icon = els.themeToggle.querySelector('.material-icons');
+                if (icon) icon.textContent = isDark ? 'dark_mode' : 'light_mode';
                 els.themeToggle.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
             }
             savePrefs({ theme });
@@ -1385,6 +1404,16 @@
             const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(b) / Math.log(k));
             return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+        }
+
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = String(value ?? '');
+            return div.innerHTML;
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         function formatDuration(seconds) {
@@ -1456,7 +1485,7 @@
 
         function updateDetailsButton() {
             if (!els.details) return;
-            els.details.textContent = state.showDetails ? 'ℹ Details: On' : 'ℹ Details: Off';
+            els.details.innerHTML = `<span class="material-icons">info</span><span>Details: ${state.showDetails ? 'On' : 'Off'}</span>`;
         }
 
         function setDetailsEnabled(enabled, opts = {}) {
@@ -1551,6 +1580,10 @@
             document.getElementById('toastMessage').textContent = msg;
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function shareUrl() {
+            return window.location.origin + '/gallery/' + encodeURIComponent(state.shareHash || '');
         }
 
         // Robust clipboard copy with iOS Safari fallback
@@ -1700,11 +1733,11 @@
             const previewUrl = `/api/share/${state.shareHash}/preview/${encodePath(path)}?v=${file.size || 0}`;
             const downloadUrl = file.download_url || `/api/share/${state.shareHash}/file/${encodePath(path)}?download=1`;
 
-            els.modalTitle.textContent = file.name;
+            els.modalTitle.textContent = file.name || 'File';
             els.modalMeta.textContent = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file.size)}`;
             els.viewOriginal.href = inlineUrl;
             els.download.href = downloadUrl;
-            els.download.download = file.name;
+            els.download.download = file.name || 'download';
 
 	            if (file.type === 'video') {
 	                els.speedBtn.style.display = 'inline-flex';
@@ -1715,13 +1748,13 @@
                 els.resetVideoBtn.style.display = 'none';
 
                 if (file.type === 'image') {
-                    els.modalContent.innerHTML = `<img class="modal-media" src="${inlineUrl}" alt="${file.name}">`;
+                    els.modalContent.innerHTML = `<img class="modal-media" src="${escapeAttr(inlineUrl)}" alt="${escapeAttr(file.name || 'Image')}">`;
                 } else {
                     els.modalContent.innerHTML = `
                         <div style="text-align:center;padding:2rem;">
                             <div style="font-size:4rem;margin-bottom:1rem;">${getFileIcon(file.extension)}</div>
                             <p>Preview not available</p>
-                            <a href="${downloadUrl}" class="action-btn" style="margin-top:1rem;display:inline-flex;">⬇️ Download</a>
+                            <a href="${escapeAttr(downloadUrl)}" class="action-btn" style="margin-top:1rem;display:inline-flex;"><span class="material-icons">download</span><span>Download</span></a>
                         </div>`;
                 }
             }
@@ -1738,7 +1771,7 @@
             video.playsInline = true;
             video.preload = 'metadata';
             video.poster = posterUrl;
-            video.innerHTML = `<source src="${videoUrl}">`;
+            video.innerHTML = `<source src="${escapeAttr(videoUrl)}">`;
 
 	            container.appendChild(video);
 	            els.modalContent.appendChild(container);
@@ -2037,7 +2070,7 @@
 
             // Update counts
             const searchLower = state.search.toLowerCase();
-            const matching = state.files.filter(f => f.name.toLowerCase().includes(searchLower));
+            const matching = state.files.filter(f => String(f && f.name || '').toLowerCase().includes(searchLower));
             document.getElementById('countAll').textContent = matching.length;
             document.getElementById('countImages').textContent = matching.filter(f => f.type === 'image').length;
             document.getElementById('countVideos').textContent = matching.filter(f => f.type === 'video').length;
@@ -2045,7 +2078,7 @@
             // Filter
             state.filteredFiles = state.files.filter(file => {
                 const matchesType = state.filter === 'all' || file.type === state.filter;
-                const matchesSearch = file.name.toLowerCase().includes(searchLower);
+                const matchesSearch = String(file && file.name || '').toLowerCase().includes(searchLower);
                 return matchesType && matchesSearch;
             });
 
@@ -2053,17 +2086,45 @@
             state.filteredFiles.sort((a, b) => {
                 const typeScore = t => t === 'image' ? 1 : (t === 'video' ? 2 : 3);
                 switch (state.sort) {
-                    case 'type_asc': return typeScore(a.type) - typeScore(b.type) || a.name.localeCompare(b.name);
-                    case 'type_desc': return typeScore(b.type) - typeScore(a.type) || a.name.localeCompare(b.name);
-                    case 'name_asc': return a.name.localeCompare(b.name);
-                    case 'name_desc': return b.name.localeCompare(a.name);
-                    case 'size_asc': return a.size - b.size;
-                    case 'size_desc': return b.size - a.size;
+                    case 'type_asc': return typeScore(a.type) - typeScore(b.type) || String(a.name || '').localeCompare(String(b.name || ''));
+                    case 'type_desc': return typeScore(b.type) - typeScore(a.type) || String(a.name || '').localeCompare(String(b.name || ''));
+                    case 'name_asc': return String(a.name || '').localeCompare(String(b.name || ''));
+                    case 'name_desc': return String(b.name || '').localeCompare(String(a.name || ''));
+                    case 'size_asc': return Number(a.size || 0) - Number(b.size || 0);
+                    case 'size_desc': return Number(b.size || 0) - Number(a.size || 0);
                     default: return 0;
                 }
             });
 
+            updateGallerySummary();
             renderGrid();
+        }
+
+        function updateGallerySummary() {
+            if (!els.gallerySummary) return;
+            const total = state.files.length;
+            const visible = state.filteredFiles.length;
+            const images = state.files.filter(f => f.type === 'image').length;
+            const videos = state.files.filter(f => f.type === 'video').length;
+            const totalBytes = state.files.reduce((sum, f) => sum + Number(f.size || 0), 0);
+            const visibleBytes = state.filteredFiles.reduce((sum, f) => sum + Number(f.size || 0), 0);
+            const fileWord = total === 1 ? 'file' : 'files';
+
+            if (!total) {
+                els.gallerySummary.textContent = 'No files shared yet';
+                return;
+            }
+
+            if (visible !== total) {
+                els.gallerySummary.textContent = `Showing ${visible} of ${total} ${fileWord} • ${formatSize(visibleBytes)} visible • ${formatSize(totalBytes)} total`;
+                return;
+            }
+
+            const parts = [`${total} ${fileWord}`];
+            if (images) parts.push(`${images} image${images !== 1 ? 's' : ''}`);
+            if (videos) parts.push(`${videos} video${videos !== 1 ? 's' : ''}`);
+            parts.push(formatSize(totalBytes));
+            els.gallerySummary.textContent = parts.join(' • ');
         }
 
         function renderGrid() {
@@ -2097,15 +2158,22 @@
             const previewUrl = `/api/share/${state.shareHash}/preview/${encodePath(path)}?v=${file.size || 0}`;
             const isVideo = file.type === 'video';
             const isImage = file.type === 'image';
+            const safeName = escapeHtml(file.name || 'File');
+            const safeNameAttr = escapeAttr(file.name || 'File');
+            const safeInlineUrl = escapeAttr(inlineUrl);
+            const safeDownloadUrl = escapeAttr(downloadUrl);
+            const safePreviewUrl = escapeAttr(previewUrl);
+            const safeExt = escapeHtml(String(file.extension || 'file').toUpperCase());
+            const safeSize = escapeAttr(Number(file.size || 0).toLocaleString() + ' bytes');
 
             let preview = '';
             if (isImage) {
                 // Use server-generated thumbnails for grid/list previews to keep memory usage low on mobile.
-                preview = `<img class="media-preview" src="${previewUrl}" data-fallback="${inlineUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${file.name}"
+                preview = `<img class="media-preview" src="${safePreviewUrl}" data-fallback="${safeInlineUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${safeNameAttr}"
                              onerror="this.onerror=null;this.src=this.dataset.fallback;">`;
             } else if (isVideo) {
                 preview = `
-                    <img class="media-preview" src="${previewUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${file.name}"
+                    <img class="media-preview" src="${safePreviewUrl}" loading="lazy" decoding="async" fetchpriority="low" alt="${safeNameAttr}"
                          style="object-fit:cover;height:200px;width:100%;"
                          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                     <div class="file-placeholder" style="background:#000;display:none;height:200px;align-items:center;justify-content:center;">
@@ -2113,7 +2181,7 @@
                     </div>
                     <div class="play-icon">▶</div>`;
             } else {
-                preview = `<div class="file-placeholder">${getFileIcon(file.extension)} ${file.extension.toUpperCase()}</div>`;
+                preview = `<div class="file-placeholder">${getFileIcon(file.extension)} ${safeExt}</div>`;
             }
 
             const tag = isVideo ? 'Video' : (isImage ? 'Image' : 'File');
@@ -2125,13 +2193,13 @@
                 </div>
                 <div class="media-info">
                     <div class="media-title">
-                        <div class="media-name" title="${file.name}">${file.name}</div>
+                        <div class="media-name" title="${safeNameAttr}">${safeName}</div>
                         ${isVideo ? `<div class="video-details" data-video-meta="1" data-path="${encodeURIComponent(path)}">Loading…</div>` : ''}
                     </div>
-                    <div class="media-meta"><span>${file.extension.toUpperCase()}</span><span title="${file.size.toLocaleString()} bytes">${formatSize(file.size)}</span></div>
+                    <div class="media-meta"><span>${safeExt}</span><span title="${safeSize}">${formatSize(file.size)}</span></div>
                     <div class="card-actions">
                         <button class="card-btn primary" onclick="openMedia(${index}, event)">${isVideo ? 'Play' : 'View'}</button>
-                        <a href="${downloadUrl}" download="${file.name}" class="card-btn">⬇</a>
+                        <a href="${safeDownloadUrl}" download="${safeNameAttr}" class="card-btn" aria-label="Download ${safeNameAttr}"><span class="material-icons">download</span></a>
                     </div>
                 </div>`;
         }
@@ -2200,8 +2268,8 @@
 
             // Copy link
             els.copyLink.onclick = async () => {
-                const success = await copyToClipboard(window.location.href);
-                showToast(success ? 'Link copied' : 'Copy failed - select and copy manually');
+                const success = await copyToClipboard(shareUrl());
+                showToast(success ? 'Gallery link copied' : 'Copy failed - select and copy manually');
             };
 
             // Stream Gallery button

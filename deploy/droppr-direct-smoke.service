@@ -1,0 +1,14 @@
+[Unit]
+Description=Smoke check Droppr direct VPS bypass
+After=network-online.target reverse-tunnel-droppr-coolmri-direct.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mlweb
+Group=mlweb
+WorkingDirectory=/home/mlweb/mri-cooling-droppr
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SyslogIdentifier=droppr-direct-smoke
+TimeoutStartSec=120
+ExecStart=/home/mlweb/mri-cooling-droppr/scripts/smoke_vps_bypass.sh --quiet --range-url https://droppr.coolmri.com/api/robust-share/RS_droppr_direct_smoke/download/range-sentinel.txt

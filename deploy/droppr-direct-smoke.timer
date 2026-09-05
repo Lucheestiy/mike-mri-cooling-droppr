@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Droppr direct VPS bypass smoke check
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

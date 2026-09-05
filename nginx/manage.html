@@ -1,0 +1,1648 @@
+<!-- VERSION: 1.0.0 - Admin Links Manager (Robust Shares + File Requests) -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Droppr Manager</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,650;9..144,750&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #07110d;
+      --panel: rgba(14, 31, 24, 0.88);
+      --panelSolid: #0e1f18;
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --muted2: #64748b;
+      --accent: #79d9a7;
+      --accent2: #a7e8ca;
+      --good: #79d9a7;
+      --warn: #e6b96f;
+      --bad: #ef8e8e;
+      --chip: rgba(255, 255, 255, 0.06);
+      --shadow: 0 22px 60px -34px rgba(0, 0, 0, 0.78);
+      --radius: 10px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --panel: rgba(255, 255, 255, 0.92);
+      --panelSolid: #ffffff;
+      --border: rgba(0, 0, 0, 0.1);
+      --text: #0f172a;
+      --muted: #475569;
+      --muted2: #64748b;
+      --chip: rgba(2, 6, 23, 0.04);
+      --shadow: 0 18px 40px -28px rgba(2, 6, 23, 0.22);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Manrope, "Avenir Next", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      background-image:
+        linear-gradient(rgba(121, 217, 167, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(121, 217, 167, 0.025) 1px, transparent 1px),
+        radial-gradient(at 8% 0%, rgba(121, 217, 167, 0.13) 0, transparent 46%),
+        radial-gradient(at 92% 4%, rgba(76, 145, 113, 0.10) 0, transparent 42%);
+      background-size: 32px 32px, 32px 32px, auto, auto;
+      overflow-x: hidden;
+    }
+
+    [data-theme="light"] body,
+    body[data-theme="light"] {
+      background-image:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0, transparent 55%),
+        radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.06) 0, transparent 55%),
+        radial-gradient(at 60% 100%, rgba(99, 102, 241, 0.07) 0, transparent 60%);
+    }
+
+    a { color: inherit; }
+    button { font-family: inherit; }
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 22px 18px 40px;
+      padding-top: max(22px, env(safe-area-inset-top, 0px));
+      padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 14px 0 12px;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: #20372e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 18px 35px -24px rgba(121, 217, 167, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      flex: 0 0 auto;
+    }
+
+    [data-theme="light"] .logo { border: 1px solid rgba(0, 0, 0, 0.08); }
+
+    .logo svg { width: 22px; height: 22px; color: white; }
+
+    .titles { min-width: 0; }
+    .titles h1 {
+      font-family: Fraunces, Georgia, serif;
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .titles p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      transition: transform .08s ease, background .15s ease, border-color .15s ease;
+      text-decoration: none;
+    }
+    .btn:hover { background: rgba(255, 255, 255, 0.10); }
+    [data-theme="light"] .btn:hover { background: rgba(2, 6, 23, 0.06); }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      background: var(--accent);
+      border-color: rgba(255, 255, 255, 0.14);
+      color: #070b16;
+    }
+    .btn.primary:hover { background: var(--accent2); }
+    .btn.danger {
+      background: rgba(239, 68, 68, 0.14);
+      border-color: rgba(239, 68, 68, 0.22);
+      color: rgba(254, 202, 202, 0.98);
+    }
+    .btn.danger:hover { background: rgba(239, 68, 68, 0.18); }
+    .btn.small { padding: 8px 10px; font-size: 12px; font-weight: 900; }
+    .btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .search {
+      flex: 1 1 auto;
+      min-width: 240px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .input {
+      flex: 1 1 auto;
+      min-width: 180px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    [data-theme="light"] .input { background: rgba(2, 6, 23, 0.04); }
+    .input:focus {
+      border-color: rgba(99, 102, 241, 0.65);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .toggles {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 11px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      user-select: none;
+    }
+    .chip input { margin: 0; }
+
+    .grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-body {
+      padding: 14px;
+    }
+
+    .formgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .field label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    [data-theme="light"] .field input { background: rgba(2, 6, 23, 0.04); }
+    .field input:focus {
+      border-color: rgba(121, 217, 167, 0.65);
+      box-shadow: 0 0 0 3px rgba(121, 217, 167, 0.14);
+    }
+
+    .help {
+      margin-top: 6px;
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .msg {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      display: none;
+    }
+    .msg.good { display: block; border-color: rgba(16, 185, 129, 0.22); background: rgba(16, 185, 129, 0.10); color: rgba(209, 250, 229, 0.95); }
+    [data-theme="light"] .msg.good { color: rgba(6, 95, 70, 0.95); }
+    .msg.bad { display: block; border-color: rgba(239, 68, 68, 0.22); background: rgba(239, 68, 68, 0.12); color: rgba(254, 202, 202, 0.98); }
+
+    .panel-hdr {
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: rgba(0, 0, 0, 0.18);
+    }
+    [data-theme="light"] .panel-hdr { background: rgba(2, 6, 23, 0.03); }
+    .panel-title {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+    }
+    .badge {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .table th, .table td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 13px;
+    }
+    .table th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.10);
+    }
+    [data-theme="light"] .table th { background: rgba(2, 6, 23, 0.03); }
+    .table tr:hover td { background: rgba(255, 255, 255, 0.04); }
+    [data-theme="light"] .table tr:hover td { background: rgba(2, 6, 23, 0.03); }
+    .detail-row td {
+      padding: 0;
+      background: rgba(0, 0, 0, 0.16);
+    }
+    [data-theme="light"] .detail-row td { background: rgba(2, 6, 23, 0.025); }
+    .detail-box {
+      padding: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .detail-head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .detail-title {
+      font-weight: 900;
+      letter-spacing: -0.01em;
+    }
+    .detail-meta {
+      margin-top: 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .kv {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--chip);
+      padding: 10px 11px;
+      min-width: 0;
+    }
+    .kv .k {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .kv .v {
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .mini-table th,
+    .mini-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 12px;
+      text-align: left;
+    }
+    .mini-table th {
+      color: var(--muted);
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.10);
+    }
+    [data-theme="light"] .mini-table th { background: rgba(2, 6, 23, 0.03); }
+    .mini-table tr:last-child td { border-bottom: 0; }
+    .detail-scroll {
+      max-height: 460px;
+      overflow: auto;
+      border-radius: 14px;
+    }
+
+    .live-transfer {
+      margin-top: 9px;
+      padding: 9px 10px;
+      border: 1px solid rgba(121, 217, 167, 0.28);
+      border-left: 3px solid var(--accent);
+      border-radius: 7px;
+      background: rgba(121, 217, 167, 0.08);
+      color: var(--text);
+      min-width: 220px;
+    }
+    .live-transfer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .live-transfer-meta {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .transfer-track {
+      height: 5px;
+      margin-top: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.09);
+      overflow: hidden;
+    }
+    .transfer-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .session-label {
+      margin: 16px 0 9px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .session-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .session-card {
+      border: 1px solid rgba(121, 217, 167, 0.24);
+      border-radius: 8px;
+      background: rgba(121, 217, 167, 0.055);
+      padding: 11px;
+      min-width: 0;
+    }
+    .session-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .session-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+    .session-state {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .session-meta {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .session-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .storage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .storage-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--chip);
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .storage-card .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .storage-card .value {
+      font-size: 1.25rem;
+      line-height: 1.15;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      word-break: break-word;
+    }
+
+    .storage-card .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .storage-actions {
+      padding: 0 14px 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .storage-msg {
+      margin: 0 14px 14px;
+    }
+
+    .mono {
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .muted { color: var(--muted); }
+    .muted2 { color: var(--muted2); }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .status.good { color: rgba(16, 185, 129, 0.95); border-color: rgba(16, 185, 129, 0.22); background: rgba(16, 185, 129, 0.10); }
+    .status.warn { color: rgba(251, 191, 36, 0.95); border-color: rgba(245, 158, 11, 0.22); background: rgba(245, 158, 11, 0.10); }
+    .status.bad { color: rgba(248, 113, 113, 0.96); border-color: rgba(239, 68, 68, 0.22); background: rgba(239, 68, 68, 0.10); }
+
+    .row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .empty {
+      padding: 26px 14px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .error {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(239, 68, 68, 0.22);
+      background: rgba(239, 68, 68, 0.12);
+      color: rgba(254, 202, 202, 0.98);
+      font-size: 13px;
+      line-height: 1.35;
+      display: none;
+    }
+
+    .note {
+      margin-top: 14px;
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 860px) {
+      .table th:nth-child(3), .table td:nth-child(3) { display: none; }
+    }
+    @media (max-width: 680px) {
+      .table th:nth-child(4), .table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="hero">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7z"></path>
+            </svg>
+          </div>
+          <div class="titles">
+            <h1>Droppr Manager</h1>
+            <p id="subtitle">Manage Robust Shares (RS_*) and File Requests (UR_*).</p>
+          </div>
+        </div>
+
+        <div class="actions">
+          <a class="btn" href="/" title="Back to FileBrowser">← FileBrowser</a>
+          <button class="btn" id="themeBtn" type="button" title="Toggle theme">Theme</button>
+          <button class="btn primary" id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">
+          <input id="searchInput" class="input" type="text" placeholder="Search by ID, title, path…" autocomplete="off" />
+        </div>
+        <div class="toggles">
+          <label class="chip"><input id="showExpired" type="checkbox" checked /> Show expired</label>
+          <label class="chip"><input id="showDisabled" type="checkbox" checked /> Show disabled</label>
+        </div>
+      </div>
+      <div id="errorBox" class="error"></div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Storage & Cache <span class="badge" id="storageTotal">0 B</span></div>
+          <div class="muted">Generated thumbnails and video proxies.</div>
+        </div>
+        <div id="storageBody">
+          <div class="empty">Loading storage…</div>
+        </div>
+        <div class="storage-actions">
+          <button class="btn small" id="storageRefreshBtn" type="button">Refresh storage</button>
+          <button class="btn small" type="button" data-clear-cache="thumbnails">Clear thumbnails</button>
+          <button class="btn small" type="button" data-clear-cache="video_proxy">Clear video cache</button>
+          <button class="btn small danger" type="button" data-clear-cache="all">Clear both</button>
+        </div>
+        <div id="storageMsg" class="msg storage-msg"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">File Requests <span class="badge" id="uploadCount">0</span></div>
+          <div class="muted">Revoke by disabling the request.</div>
+        </div>
+        <div id="uploadTableWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Robust Shares <span class="badge" id="robustCount">0</span></div>
+          <div class="muted">Revoke by deleting the share.</div>
+        </div>
+        <div id="robustTableWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Session Settings</div>
+          <div class="muted">Client-side logout timers (0 disables).</div>
+        </div>
+        <div class="panel-body">
+          <div class="formgrid">
+            <div class="field">
+              <label for="sessAdminIdle">Admin idle (min)</label>
+              <input id="sessAdminIdle" type="number" min="0" step="1" />
+              <div class="help">Logout after no activity.</div>
+            </div>
+            <div class="field">
+              <label for="sessAdminMax">Admin max (min)</label>
+              <input id="sessAdminMax" type="number" min="0" step="1" />
+              <div class="help">Max session age (even if active).</div>
+            </div>
+            <div class="field">
+              <label for="sessUserIdle">User idle (min)</label>
+              <input id="sessUserIdle" type="number" min="0" step="1" />
+              <div class="help">Non-admin idle timeout.</div>
+            </div>
+            <div class="field">
+              <label for="sessUserMax">User max (min)</label>
+              <input id="sessUserMax" type="number" min="0" step="1" />
+              <div class="help">Non-admin max session age.</div>
+            </div>
+            <div class="field">
+              <label for="sessWarnSec">Warning (sec)</label>
+              <input id="sessWarnSec" type="number" min="0" step="1" />
+              <div class="help">Countdown shown before logout.</div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="sessSaveBtn" type="button">Save</button>
+            <button class="btn" id="sessResetBtn" type="button">Reset defaults</button>
+          </div>
+
+          <div id="sessMsg" class="msg"></div>
+          <div class="note">Changes apply on refresh (and will gradually propagate to open tabs).</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="note">
+      This page is public, but data/actions require your FileBrowser login token. If you see “Missing auth”, log in at the main UI.
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      function $(id) { return document.getElementById(id); }
+
+      function getCookie(name) {
+        var m = (document.cookie || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)"));
+        return m ? m[1] : null;
+      }
+
+      function getAuthToken() {
+        try {
+          var jwt = localStorage.getItem("jwt");
+          if (jwt) return jwt;
+        } catch (e) {}
+
+        var auth = getCookie("auth");
+        if (auth) {
+          try { return decodeURIComponent(auth); } catch (e2) { return auth; }
+        }
+        return null;
+      }
+
+      function setTheme(next) {
+        try { document.documentElement.setAttribute('data-theme', next); } catch (e) {}
+        try { localStorage.setItem('droppr_manage_theme', next); } catch (e2) {}
+        try { $('themeBtn').textContent = next === 'light' ? 'Light' : 'Dark'; } catch (e3) {}
+      }
+
+      function initTheme() {
+        var stored = null;
+        try { stored = localStorage.getItem('droppr_manage_theme'); } catch (e) {}
+        setTheme(stored === 'light' ? 'light' : 'dark');
+      }
+
+      function showError(msg) {
+        var el = $('errorBox');
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+      }
+
+      function setSessMsg(kind, msg) {
+        var el = $('sessMsg');
+        if (!el) return;
+        el.className = 'msg' + (kind ? (' ' + kind) : '');
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+      }
+
+      function setStorageMsg(kind, msg) {
+        var el = $('storageMsg');
+        if (!el) return;
+        el.className = 'msg storage-msg' + (kind ? (' ' + kind) : '');
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+      }
+
+      function readInt(id) {
+        var el = $(id);
+        if (!el) return 0;
+        var v = parseInt(String(el.value || '').trim(), 10);
+        return isFinite(v) && v >= 0 ? v : 0;
+      }
+
+      function copyText(text) {
+        var value = String(text || '');
+        if (!value) return Promise.reject(new Error("empty"));
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(value);
+        }
+
+        return new Promise(function (resolve, reject) {
+          var ta = document.createElement('textarea');
+          ta.value = value;
+          ta.setAttribute('readonly', 'readonly');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          try {
+            ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (ok) resolve();
+            else reject(new Error("copy failed"));
+          } catch (e) {
+            try { document.body.removeChild(ta); } catch (e2) {}
+            reject(e);
+          }
+        });
+      }
+
+      function formatBytes(bytes) {
+        var n = Number(bytes || 0);
+        if (!isFinite(n) || n <= 0) return '0 B';
+        var units = ['B','KB','MB','GB','TB'];
+        var i = Math.floor(Math.log(n)/Math.log(1024));
+        i = Math.max(0, Math.min(i, units.length - 1));
+        var v = n / Math.pow(1024, i);
+        return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + ' ' + units[i];
+      }
+
+      function fmtTime(ts) {
+        if (!ts) return '—';
+        try { return new Date(Number(ts) * 1000).toLocaleString(); } catch (e) { return '—'; }
+      }
+
+      function formatAge(seconds) {
+        var n = Math.max(0, Number(seconds || 0));
+        if (n < 60) return Math.floor(n) + 's ago';
+        if (n < 3600) return Math.floor(n / 60) + 'm ago';
+        if (n < 86400) return Math.floor(n / 3600) + 'h ago';
+        return Math.floor(n / 86400) + 'd ago';
+      }
+
+      function statusPill(status) {
+        var s = String(status || '').toLowerCase();
+        if (s === 'active') return '<span class="status good">active</span>';
+        if (s === 'expired') return '<span class="status warn">expired</span>';
+        if (s === 'disabled') return '<span class="status bad">disabled</span>';
+        return '<span class="status">' + escapeHtml(s || 'unknown') + '</span>';
+      }
+
+      function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = String(text || '');
+        return div.innerHTML;
+      }
+
+      function matchesSearch(obj, q) {
+        if (!q) return true;
+        q = String(q).toLowerCase();
+        var hay = JSON.stringify(obj || {}).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }
+
+      function apiFetch(path, opts) {
+        var token = getAuthToken();
+        var options = opts || {};
+        var headers = options.headers || {};
+        if (token) headers['X-Auth'] = token;
+        options.headers = headers;
+        return fetch(path, options).then(function (res) {
+          return res.text().then(function (text) {
+            var data = null;
+            try { data = JSON.parse(text || '{}'); } catch (e) { data = null; }
+            if (!res.ok) {
+              var msg = (data && data.error) ? String(data.error) : (text || ('HTTP ' + res.status));
+              var err = new Error(msg);
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+
+      function loadSessionSettings() {
+        setSessMsg('', '');
+        return apiFetch('/api/droppr/session-settings', { method: 'GET' }).then(function (data) {
+          var s = data && data.session ? data.session : null;
+          if (!s) throw new Error('Missing session settings');
+          $('sessAdminIdle').value = String(Number(s.admin_idle_minutes || 0));
+          $('sessAdminMax').value = String(Number(s.admin_max_minutes || 0));
+          $('sessUserIdle').value = String(Number(s.user_idle_minutes || 0));
+          $('sessUserMax').value = String(Number(s.user_max_minutes || 0));
+          $('sessWarnSec').value = String(Number(s.warning_seconds || 0));
+        }).catch(function (err) {
+          setSessMsg('bad', String(err && err.message ? err.message : err));
+        });
+      }
+
+      function saveSessionSettings(mode) {
+        var isReset = mode === 'reset';
+        var btn = isReset ? $('sessResetBtn') : $('sessSaveBtn');
+        if (btn) btn.disabled = true;
+        setSessMsg('', '');
+
+        var payload = isReset
+          ? { reset: true }
+          : {
+              admin_idle_minutes: readInt('sessAdminIdle'),
+              user_idle_minutes: readInt('sessUserIdle'),
+              admin_max_minutes: readInt('sessAdminMax'),
+              user_max_minutes: readInt('sessUserMax'),
+              warning_seconds: readInt('sessWarnSec'),
+            };
+
+        return apiFetch('/api/droppr/session-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).then(function (data) {
+          var s = data && data.session ? data.session : null;
+          if (s) {
+            $('sessAdminIdle').value = String(Number(s.admin_idle_minutes || 0));
+            $('sessAdminMax').value = String(Number(s.admin_max_minutes || 0));
+            $('sessUserIdle').value = String(Number(s.user_idle_minutes || 0));
+            $('sessUserMax').value = String(Number(s.user_max_minutes || 0));
+            $('sessWarnSec').value = String(Number(s.warning_seconds || 0));
+          }
+          setSessMsg('good', isReset ? 'Reset to defaults.' : 'Saved.');
+          setTimeout(function () { setSessMsg('', ''); }, 1200);
+        }).catch(function (err) {
+          setSessMsg('bad', String(err && err.message ? err.message : err));
+        }).finally(function () {
+          if (btn) btn.disabled = false;
+        });
+      }
+
+      function pct(part, total) {
+        var p = Number(part || 0);
+        var t = Number(total || 0);
+        if (!isFinite(p) || !isFinite(t) || t <= 0) return '0%';
+        return Math.max(0, Math.min(100, (p / t) * 100)).toFixed(1) + '%';
+      }
+
+      function storageCardHtml(label, value, sub) {
+        return '<div class="storage-card">' +
+          '<div class="label">' + escapeHtml(label) + '</div>' +
+          '<div class="value">' + escapeHtml(value) + '</div>' +
+          '<div class="sub">' + escapeHtml(sub || '') + '</div>' +
+        '</div>';
+      }
+
+      function renderStorage(storage) {
+        var body = $('storageBody');
+        if (!body) return;
+
+        if (!storage) {
+          body.innerHTML = '<div class="empty">Storage stats unavailable.</div>';
+          $('storageTotal').textContent = '0 B';
+          return;
+        }
+
+        var targets = storage.targets || {};
+        var thumbs = targets.thumbnails || {};
+        var proxy = targets.video_proxy || {};
+        var disk = storage.disk || {};
+        var totalBytes = Number(storage.total_cache_bytes || 0);
+        var totalFiles = Number(storage.total_cache_files || 0);
+
+        $('storageTotal').textContent = formatBytes(totalBytes);
+
+        var html = '<div class="storage-grid">';
+        html += storageCardHtml(
+          'Thumbnail cache',
+          formatBytes(thumbs.bytes || 0),
+          Number(thumbs.files || 0) + ' files' +
+            (thumbs.lock_files ? ', ' + Number(thumbs.lock_files || 0) + ' locks' : '') +
+            (thumbs.newest_mtime ? ', newest ' + fmtTime(thumbs.newest_mtime) : '')
+        );
+        html += storageCardHtml(
+          'Video cache',
+          formatBytes(proxy.bytes || 0),
+          Number(proxy.files || 0) + ' files' +
+            (proxy.lock_files ? ', ' + Number(proxy.lock_files || 0) + ' locks' : '') +
+            (proxy.newest_mtime ? ', newest ' + fmtTime(proxy.newest_mtime) : '')
+        );
+        html += storageCardHtml(
+          'Generated total',
+          formatBytes(totalBytes),
+          totalFiles + ' files, clears skip files touched in the last ' +
+            Math.round(Number(storage.clear_min_age_seconds || 0) / 60) + ' min'
+        );
+        html += storageCardHtml(
+          'Disk free',
+          formatBytes(disk.free || 0),
+          pct(disk.used || 0, disk.total || 0) + ' used at ' + (disk.path || 'disk')
+        );
+        html += '</div>';
+        body.innerHTML = html;
+      }
+
+      function loadStorage() {
+        setStorageMsg('', '');
+        return apiFetch('/api/droppr/storage', { method: 'GET' })
+          .then(function (data) {
+            state.storage = data && data.storage ? data.storage : null;
+            renderStorage(state.storage);
+          })
+          .catch(function (err) {
+            setStorageMsg('bad', String(err && err.message ? err.message : err));
+            renderStorage(state.storage);
+          });
+      }
+
+      function cacheTargetLabel(target) {
+        if (target === 'thumbnails') return 'thumbnail cache';
+        if (target === 'video_proxy') return 'video cache';
+        return 'thumbnail and video caches';
+      }
+
+      function clearStorage(target, button) {
+        var label = cacheTargetLabel(target);
+        if (!confirm('Clear ' + label + '? Generated cache files will be recreated on demand. Recent files and lock files are skipped.')) {
+          return;
+        }
+
+        var old = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Clearing';
+        }
+        setStorageMsg('', '');
+
+        return apiFetch('/api/droppr/storage/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: target }),
+        }).then(function (data) {
+          state.storage = data && data.storage ? data.storage : state.storage;
+          renderStorage(state.storage);
+
+          var files = 0;
+          var bytes = 0;
+          var recent = 0;
+          var locks = 0;
+          (data.results || []).forEach(function (r) {
+            files += Number(r.deleted_files || 0);
+            bytes += Number(r.deleted_bytes || 0);
+            recent += Number(r.skipped_recent || 0);
+            locks += Number(r.skipped_locks || 0);
+          });
+          setStorageMsg('good', 'Cleared ' + files + ' files (' + formatBytes(bytes) + '). Skipped ' + recent + ' recent and ' + locks + ' lock files.');
+          setTimeout(function () { setStorageMsg('', ''); }, 2200);
+        }).catch(function (err) {
+          setStorageMsg('bad', 'Clear failed: ' + String(err && err.message ? err.message : err));
+        }).finally(function () {
+          if (button) {
+            button.disabled = false;
+            button.textContent = old;
+          }
+        });
+      }
+
+      function uploadRequestDetailHtml(requestId) {
+        var detail = state.uploadDetails[requestId];
+        if (!detail) {
+          return '<div class="detail-box"><div class="empty">Loading upload details…</div></div>';
+        }
+
+        if (detail.error) {
+          return '<div class="detail-box"><div class="error" style="display:block;margin-top:0">' + escapeHtml(detail.error) + '</div></div>';
+        }
+
+        var url = window.location.origin + (detail.upload_url || ('/upload/' + requestId));
+        var viewUrl = detail.share_back_url ? (window.location.origin + detail.share_back_url) : null;
+        var files = detail.files || [];
+        var sessions = detail.sessions || [];
+        var shareBack = detail.share_back || {};
+        var shareBackState = String(shareBack.state || detail.share_back_state || '').replace(/_/g, ' ');
+        var shareBackText = detail.share_back_enabled ? shareBackState : 'disabled';
+        if (viewUrl && shareBackState === 'active') shareBackText = 'active, created ' + fmtTime(detail.share_back_created_at);
+        if (viewUrl && shareBackState === 'expired') shareBackText = 'expired, created ' + fmtTime(detail.share_back_created_at);
+        var returned = Number(detail.files_returned || files.length || 0);
+        var totalFiles = Number(detail.uploaded_files || files.length || 0);
+        var fileCountText = totalFiles === returned
+          ? (totalFiles + ' files')
+          : ('showing ' + returned + ' of ' + totalFiles + ' files');
+
+        var html = '';
+        html += '<div class="detail-box">' +
+          '<div class="detail-head">' +
+            '<div>' +
+              '<div class="detail-title">Upload audit</div>' +
+              '<div class="detail-meta">' +
+                '<span>Created ' + escapeHtml(fmtTime(detail.created_at)) + '</span>' +
+                '<span>' + escapeHtml(fileCountText) + '</span>' +
+                '<span>' + escapeHtml(formatBytes(detail.uploaded_bytes || 0)) + '</span>' +
+                (detail.password_protected ? '<span>password protected</span>' : '<span>public upload link</span>') +
+              '</div>' +
+            '</div>' +
+            '<div class="row-actions">' +
+              '<button class="btn small" data-copy="' + escapeHtml(url) + '">Copy upload link</button>' +
+              '<button class="btn small" data-export-upload="' + escapeHtml(requestId) + '">Export CSV</button>' +
+              (viewUrl ? '<button class="btn small" data-copy="' + escapeHtml(viewUrl) + '">Copy view link</button>' : '') +
+              (viewUrl ? '<a class="btn small" href="' + escapeHtml(viewUrl) + '" target="_blank" rel="noopener">Open view</a>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="detail-grid">' +
+            '<div class="kv"><div class="k">Destination</div><div class="v mono">' + escapeHtml(detail.dest_path || '') + '</div></div>' +
+            '<div class="kv"><div class="k">Stored under</div><div class="v mono">' + escapeHtml(detail.target_path || '') + '</div></div>' +
+            '<div class="kv"><div class="k">Share back</div><div class="v">' + escapeHtml(shareBackText) + '</div></div>' +
+            '<div class="kv"><div class="k">Limits</div><div class="v">' +
+              escapeHtml([
+                detail.max_files ? ('max files ' + Number(detail.max_files)) : 'unlimited files',
+                detail.max_file_size_bytes ? ('max file ' + formatBytes(detail.max_file_size_bytes)) : 'server file limit',
+                (detail.allowed_exts && detail.allowed_exts.length) ? ('types .' + detail.allowed_exts.join(', .')) : 'any type',
+                detail.overwrite ? 'overwrite on' : 'unique names'
+              ].join(' • ')) +
+            '</div></div>' +
+          '</div>';
+
+        if (sessions.length) {
+          html += '<div class="session-label">Live transfer manifest</div><div class="session-grid">';
+          sessions.forEach(function (session) {
+            var progress = Math.max(0, Math.min(100, Number(session.progress || 0) * 100));
+            var verifiedText = session.verified ? 'SHA-256 verified' : 'legacy resumable';
+            html += '<div class="session-card">' +
+              '<div class="session-card-head">' +
+                '<div class="session-name">' + escapeHtml(session.original_name || '') + '</div>' +
+                '<div class="session-state">' + escapeHtml(session.status || 'active') + '</div>' +
+              '</div>' +
+              '<div class="session-meta">' +
+                escapeHtml(formatBytes(session.received_bytes || 0) + ' of ' + formatBytes(session.size_bytes || 0)) +
+                ' • ' + escapeHtml(String(session.received_count || 0) + '/' + String(session.chunk_count || 0) + ' chunks') +
+                ' • ' + escapeHtml(verifiedText) +
+                '<br>Last activity ' + escapeHtml(formatAge(session.idle_seconds || 0)) +
+              '</div>' +
+              '<div class="transfer-track" aria-label="' + progress.toFixed(1) + '% received"><div class="transfer-fill" style="width:' + progress.toFixed(1) + '%"></div></div>' +
+              '<div class="session-actions">' +
+                '<span class="mono muted">' + escapeHtml(session.session_id || '') + '</span>' +
+                (session.status === 'active' ? '<button class="btn small danger" data-cancel-session="' + escapeHtml(session.session_id || '') + '" data-request-id="' + escapeHtml(requestId) + '">Cancel partial</button>' : '<span class="muted">finalizing</span>') +
+              '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+        }
+
+        if (!files.length) {
+          html += '<div class="empty" style="border:1px solid var(--border);border-radius:14px">' +
+            (sessions.length ? 'No transfers have completed yet.' : 'No files have been uploaded through this request yet.') +
+          '</div>';
+        } else {
+          html += '<div class="detail-scroll"><table class="mini-table"><thead><tr>' +
+            '<th>File</th><th>Stored path</th><th>Size</th><th>Uploaded</th>' +
+            '</tr></thead><tbody>';
+          files.forEach(function (f) {
+            html += '<tr>' +
+              '<td>' +
+                '<div class="mono">' + escapeHtml(f.original_name || '') + '</div>' +
+                (f.content_type ? '<div class="muted" style="margin-top:5px">' + escapeHtml(f.content_type) + '</div>' : '') +
+              '</td>' +
+              '<td>' +
+                '<div class="mono">' + escapeHtml(f.stored_path || f.stored_name || '') + '</div>' +
+                '<button class="btn small" style="margin-top:8px" data-copy="' + escapeHtml(f.stored_path || f.stored_name || '') + '">Copy path</button>' +
+              '</td>' +
+              '<td>' + escapeHtml(formatBytes(f.size_bytes || 0)) + '</td>' +
+              '<td>' + escapeHtml(fmtTime(f.created_at)) + '</td>' +
+            '</tr>';
+          });
+          html += '</tbody></table></div>';
+        }
+
+        html += '</div>';
+        return html;
+      }
+
+      function renderUploadRequests(items) {
+        $('uploadCount').textContent = String(items.length);
+
+        if (!items.length) {
+          $('uploadTableWrap').innerHTML = '<div class="empty">No file requests found.</div>';
+          return;
+        }
+
+        var html = '';
+        html += '<table class="table"><thead><tr>' +
+          '<th>Status</th><th>Request</th><th>Destination</th><th>Limits</th><th>Actions</th>' +
+          '</tr></thead><tbody>';
+
+        items.forEach(function (r) {
+          var url = window.location.origin + (r.upload_url || ('/upload/' + r.request_id));
+          var viewUrl = r.share_back_url ? (window.location.origin + r.share_back_url) : null;
+          var title = r.title || '';
+          var limits = [];
+          if (r.max_files && Number(r.max_files) > 0) limits.push('max files: ' + Number(r.max_files));
+          if (r.max_file_size_bytes && Number(r.max_file_size_bytes) > 0) limits.push('max file: ' + formatBytes(r.max_file_size_bytes));
+          if (r.allowed_exts && r.allowed_exts.length) limits.push('exts: ' + r.allowed_exts.join(','));
+          limits.push('overwrite: ' + (r.overwrite ? 'yes' : 'no'));
+          limits.push('uploaded: ' + Number(r.uploaded_files || 0) + ' / ' + formatBytes(r.uploaded_bytes || 0));
+          var activeCount = Number(r.active_session_count || 0);
+          var activeProgress = Math.max(0, Math.min(100, Number(r.active_progress || 0) * 100));
+          var activeAge = r.active_last_updated_at
+            ? formatAge(Math.max(0, Math.floor(Date.now() / 1000) - Number(r.active_last_updated_at)))
+            : '—';
+          var liveHtml = activeCount ? (
+            '<div class="live-transfer">' +
+              '<div class="live-transfer-head"><span>' + activeCount + ' live transfer' + (activeCount === 1 ? '' : 's') + '</span><span>' + activeProgress.toFixed(1) + '%</span></div>' +
+              '<div class="live-transfer-meta">' + escapeHtml(formatBytes(r.active_received_bytes || 0) + ' of ' + formatBytes(r.active_total_bytes || 0)) +
+                ' • ' + Number(r.active_verified_count || 0) + ' verified • active ' + escapeHtml(activeAge) + '</div>' +
+              '<div class="transfer-track"><div class="transfer-fill" style="width:' + activeProgress.toFixed(1) + '%"></div></div>' +
+            '</div>'
+          ) : '';
+
+          html += '<tr>' +
+            '<td>' + statusPill(r.status) + '</td>' +
+            '<td>' +
+              '<div class="mono">' + escapeHtml(r.request_id) + '</div>' +
+              '<div class="muted2" style="margin-top:6px">' + (title ? escapeHtml(title) : '<span class="muted">—</span>') + '</div>' +
+              '<div class="muted" style="margin-top:6px">Expires: ' + escapeHtml(r.expires_at ? fmtTime(r.expires_at) : 'never') + '</div>' +
+            '</td>' +
+            '<td>' +
+              '<div class="mono">' + escapeHtml(r.target_path || r.dest_path || '') + '</div>' +
+              (r.dest_path && r.target_path && r.dest_path !== r.target_path
+                ? ('<div class="muted" style="margin-top:6px">Dest: <span class="mono">' + escapeHtml(r.dest_path) + '</span></div>')
+                : '') +
+            '</td>' +
+            '<td class="muted2">' + escapeHtml(limits.join(' • ')) + liveHtml + '</td>' +
+            '<td>' +
+              '<div class="row-actions">' +
+                '<button class="btn small" data-copy="' + escapeHtml(url) + '">Copy link</button>' +
+                '<a class="btn small" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open</a>' +
+                (viewUrl ? ('<a class="btn small" href="' + escapeHtml(viewUrl) + '" target="_blank" rel="noopener">View</a>') : '') +
+                '<button class="btn small" data-export-upload="' + escapeHtml(r.request_id) + '">CSV</button>' +
+                '<button class="btn small" data-detail="' + escapeHtml(r.request_id) + '">' + (state.uploadExpanded[r.request_id] ? 'Hide details' : 'Details') + '</button>' +
+                (r.status === 'active'
+                  ? ('<button class="btn small danger" data-disable="' + escapeHtml(r.request_id) + '">Disable</button>')
+                  : '<span class="muted">—</span>') +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+          if (state.uploadExpanded[r.request_id]) {
+            html += '<tr class="detail-row"><td colspan="5">' + uploadRequestDetailHtml(r.request_id) + '</td></tr>';
+          }
+        });
+
+        html += '</tbody></table>';
+        $('uploadTableWrap').innerHTML = html;
+      }
+
+      function renderRobustShares(items) {
+        $('robustCount').textContent = String(items.length);
+
+        if (!items.length) {
+          $('robustTableWrap').innerHTML = '<div class="empty">No robust shares found.</div>';
+          return;
+        }
+
+        var html = '';
+        html += '<table class="table"><thead><tr>' +
+          '<th>Status</th><th>Share</th><th>Path</th><th>Stats</th><th>Actions</th>' +
+          '</tr></thead><tbody>';
+
+        items.forEach(function (s) {
+          var url = window.location.origin + (s.share_url || ('/share/' + s.share_id));
+          var title = s.title || '';
+          var stats = [];
+          stats.push((s.share_type || 'share') + ' • ' + Number(s.file_count || 0) + ' files');
+          stats.push(formatBytes(s.total_size || 0));
+          stats.push('access: ' + Number(s.access_count || 0));
+          stats.push('created: ' + fmtTime(s.created_at));
+          stats.push('expires: ' + (s.expires_at ? fmtTime(s.expires_at) : 'never'));
+
+          html += '<tr>' +
+            '<td>' + statusPill(s.status) + '</td>' +
+            '<td>' +
+              '<div class="mono">' + escapeHtml(s.share_id) + '</div>' +
+              '<div class="muted2" style="margin-top:6px">' + (title ? escapeHtml(title) : '<span class="muted">—</span>') + '</div>' +
+              (s.password_protected ? '<div class="muted" style="margin-top:6px">🔒 password</div>' : '<div class="muted" style="margin-top:6px">public</div>') +
+            '</td>' +
+            '<td><div class="mono">' + escapeHtml(s.source_path || '') + '</div></td>' +
+            '<td class="muted2">' + escapeHtml(stats.join(' • ')) + '</td>' +
+            '<td>' +
+              '<div class="row-actions">' +
+                '<button class="btn small" data-copy="' + escapeHtml(url) + '">Copy link</button>' +
+                '<a class="btn small" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open</a>' +
+                '<button class="btn small" data-refresh-share="' + escapeHtml(s.share_id) + '">Refresh files</button>' +
+                '<button class="btn small danger" data-delete="' + escapeHtml(s.share_id) + '">Delete</button>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+        });
+
+        html += '</tbody></table>';
+        $('robustTableWrap').innerHTML = html;
+      }
+
+      var state = { uploads: [], robust: [], uploadDetails: {}, uploadExpanded: {}, storage: null };
+
+      function applyFiltersAndRender() {
+        var q = String($('searchInput').value || '').trim();
+        var showExpired = $('showExpired').checked;
+        var showDisabled = $('showDisabled').checked;
+
+        var uploads = (state.uploads || []).filter(function (r) {
+          if (!matchesSearch(r, q)) return false;
+          var st = String(r.status || '').toLowerCase();
+          if (!showExpired && st === 'expired') return false;
+          if (!showDisabled && st === 'disabled') return false;
+          return true;
+        });
+
+        var robust = (state.robust || []).filter(function (s) {
+          if (!matchesSearch(s, q)) return false;
+          var st = String(s.status || '').toLowerCase();
+          if (!showExpired && st === 'expired') return false;
+          return true;
+        });
+
+        renderUploadRequests(uploads);
+        renderRobustShares(robust);
+      }
+
+      function refresh() {
+        showError('');
+        var token = getAuthToken();
+        if (!token) {
+          showError('Missing auth token. Log in at the main FileBrowser UI first.');
+        }
+
+        loadSessionSettings();
+        loadStorage();
+
+        return Promise.all([
+          apiFetch('/api/upload-requests?limit=1000', { method: 'GET' }),
+          apiFetch('/api/robust-shares?limit=1000', { method: 'GET' }),
+        ]).then(function (res) {
+          state.uploads = (res[0] && res[0].requests) ? res[0].requests : [];
+          state.robust = (res[1] && res[1].shares) ? res[1].shares : [];
+          applyFiltersAndRender();
+        }).catch(function (err) {
+          showError(String(err && err.message ? err.message : err));
+          applyFiltersAndRender();
+        });
+      }
+
+      function pollUploadProgress() {
+        if (document.visibilityState === 'hidden') return;
+        return apiFetch('/api/upload-requests?limit=1000', { method: 'GET' })
+          .then(function (data) {
+            state.uploads = data && data.requests ? data.requests : state.uploads;
+            var expanded = Object.keys(state.uploadExpanded).filter(function (requestId) {
+              return state.uploadExpanded[requestId] === true;
+            });
+            return Promise.all(expanded.map(function (requestId) {
+              return apiFetch('/api/upload-request/' + encodeURIComponent(requestId) + '/detail', { method: 'GET' })
+                .then(function (detailData) {
+                  if (detailData && detailData.request) state.uploadDetails[requestId] = detailData.request;
+                }).catch(function () {});
+            }));
+          })
+          .then(applyFiltersAndRender)
+          .catch(function () {});
+      }
+
+      function loadUploadDetail(requestId) {
+        state.uploadDetails[requestId] = null;
+        applyFiltersAndRender();
+
+        return apiFetch('/api/upload-request/' + encodeURIComponent(requestId) + '/detail', { method: 'GET' })
+          .then(function (data) {
+            state.uploadDetails[requestId] = data && data.request ? data.request : { error: 'Malformed detail response' };
+          })
+          .catch(function (err) {
+            state.uploadDetails[requestId] = { error: String(err && err.message ? err.message : err) };
+          })
+          .finally(function () {
+            applyFiltersAndRender();
+          });
+      }
+
+      function downloadUploadCsv(requestId, button) {
+        var old = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Exporting';
+        }
+
+        showError('');
+        var headers = {};
+        var token = getAuthToken();
+        if (token) headers['X-Auth'] = token;
+
+        return fetch('/api/upload-request/' + encodeURIComponent(requestId) + '/export.csv', {
+          method: 'GET',
+          headers: headers,
+        }).then(function (res) {
+          if (!res.ok) {
+            return res.text().then(function (text) {
+              throw new Error(text || ('HTTP ' + res.status));
+            });
+          }
+          return res.blob();
+        }).then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'droppr-upload-' + requestId + '.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }).catch(function (err) {
+          showError('CSV export failed: ' + String(err && err.message ? err.message : err));
+        }).finally(function () {
+          if (button) {
+            button.disabled = false;
+            button.textContent = old;
+          }
+        });
+      }
+
+      function refreshRobustShare(shareId, button) {
+        var old = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Refreshing';
+        }
+
+        showError('');
+        return apiFetch('/api/robust-share/' + encodeURIComponent(shareId) + '/refresh', {
+          method: 'POST',
+        }).then(function (data) {
+          var share = data && data.share ? data.share : null;
+          if (share) {
+            state.robust = (state.robust || []).map(function (item) {
+              return item.share_id === share.share_id ? share : item;
+            });
+            applyFiltersAndRender();
+          } else {
+            return refresh();
+          }
+
+          if (button) {
+            button.textContent = 'Refreshed';
+            setTimeout(function () {
+              button.textContent = old;
+            }, 1200);
+          }
+        }).catch(function (err) {
+          showError('Refresh failed: ' + String(err && err.message ? err.message : err));
+        }).finally(function () {
+          if (button) {
+            button.disabled = false;
+            if (button.textContent === 'Refreshing') button.textContent = old;
+          }
+        });
+      }
+
+      function cancelUploadSession(requestId, sessionId, button) {
+        if (!confirm('Cancel this partial transfer? Received chunks will be deleted and the sender will need to restart this file.')) {
+          return;
+        }
+        var old = button ? button.textContent : '';
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Canceling';
+        }
+        showError('');
+        return apiFetch(
+          '/api/upload-request/' + encodeURIComponent(requestId) + '/session/' + encodeURIComponent(sessionId) + '/admin',
+          { method: 'DELETE' }
+        ).then(function () {
+          return Promise.all([refresh(), loadUploadDetail(requestId)]);
+        }).catch(function (err) {
+          showError('Cancel failed: ' + String(err && err.message ? err.message : err));
+        }).finally(function () {
+          if (button) {
+            button.disabled = false;
+            button.textContent = old;
+          }
+        });
+      }
+
+      function onClick(e) {
+        var t = e && e.target;
+        if (!t) return;
+
+        var copy = t.getAttribute && t.getAttribute('data-copy');
+        if (copy) {
+          copyText(copy).then(function () {
+            var old = t.textContent;
+            t.textContent = 'Copied';
+            setTimeout(function () { t.textContent = old; }, 1000);
+          }).catch(function () {});
+          return;
+        }
+
+        var clearCache = t.getAttribute && t.getAttribute('data-clear-cache');
+        if (clearCache) {
+          clearStorage(clearCache, t);
+          return;
+        }
+
+        var uploadExport = t.getAttribute && t.getAttribute('data-export-upload');
+        if (uploadExport) {
+          downloadUploadCsv(uploadExport, t);
+          return;
+        }
+
+        var cancelSession = t.getAttribute && t.getAttribute('data-cancel-session');
+        if (cancelSession) {
+          var requestId = t.getAttribute('data-request-id');
+          if (requestId) cancelUploadSession(requestId, cancelSession, t);
+          return;
+        }
+
+        var detail = t.getAttribute && t.getAttribute('data-detail');
+        if (detail) {
+          state.uploadExpanded[detail] = !state.uploadExpanded[detail];
+          if (state.uploadExpanded[detail] && !state.uploadDetails[detail]) {
+            loadUploadDetail(detail);
+          } else {
+            applyFiltersAndRender();
+          }
+          return;
+        }
+
+        var refreshShare = t.getAttribute && t.getAttribute('data-refresh-share');
+        if (refreshShare) {
+          refreshRobustShare(refreshShare, t);
+          return;
+        }
+
+        var disable = t.getAttribute && t.getAttribute('data-disable');
+        if (disable) {
+          if (!confirm('Disable file request ' + disable + '?')) return;
+          t.disabled = true;
+          apiFetch('/api/upload-request/' + encodeURIComponent(disable), { method: 'DELETE' })
+            .then(refresh)
+            .catch(function (err) { showError(String(err && err.message ? err.message : err)); })
+            .finally(function () { t.disabled = false; });
+          return;
+        }
+
+        var del = t.getAttribute && t.getAttribute('data-delete');
+        if (del) {
+          if (!confirm('Delete robust share ' + del + '? This revokes the link immediately.')) return;
+          t.disabled = true;
+          apiFetch('/api/robust-share/' + encodeURIComponent(del), { method: 'DELETE' })
+            .then(refresh)
+            .catch(function (err) { showError(String(err && err.message ? err.message : err)); })
+            .finally(function () { t.disabled = false; });
+          return;
+        }
+      }
+
+      function boot() {
+        initTheme();
+        $('themeBtn').addEventListener('click', function () {
+          var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+          setTheme(cur === 'light' ? 'dark' : 'light');
+        });
+
+        $('refreshBtn').addEventListener('click', function () { refresh(); });
+        $('storageRefreshBtn').addEventListener('click', function () { loadStorage(); });
+        $('sessSaveBtn').addEventListener('click', function () { saveSessionSettings('save'); });
+        $('sessResetBtn').addEventListener('click', function () {
+          if (!confirm('Reset session settings to defaults?')) return;
+          saveSessionSettings('reset');
+        });
+        $('searchInput').addEventListener('input', applyFiltersAndRender);
+        $('showExpired').addEventListener('change', applyFiltersAndRender);
+        $('showDisabled').addEventListener('change', applyFiltersAndRender);
+
+        document.addEventListener('click', onClick);
+
+        $('uploadTableWrap').innerHTML = '<div class="empty">Loading…</div>';
+        $('robustTableWrap').innerHTML = '<div class="empty">Loading…</div>';
+        loadSessionSettings();
+        refresh();
+        window.setInterval(pollUploadProgress, 10000);
+      }
+
+      boot();
+    })();
+  </script>
+</body>
+</html>

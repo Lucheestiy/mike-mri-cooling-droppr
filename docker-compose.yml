@@ -29,6 +29,9 @@ services:
       - ./nginx/stream-gallery.html:/usr/share/nginx/html/stream-gallery.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
       - ./nginx-fixed/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
+      - ./nginx/robust-share.html:/usr/share/nginx/html/robust-share.html:ro
+      - ./nginx/upload-request.html:/usr/share/nginx/html/upload-request.html:ro
+      - ./nginx/manage.html:/usr/share/nginx/html/manage.html:ro
       - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
     depends_on:
       - app
@@ -61,15 +64,38 @@ services:
       context: ./media-server
     container_name: droppr-media-server
     restart: unless-stopped
-    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 10 --access-logfile - --error-logfile - app:app
+    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 10 --timeout 7200 --graceful-timeout 30 --access-logfile - --error-logfile - app:app
     user: "1000:1000"
     volumes:
       - ./database:/database
+      - ./data:/srv
     environment:
+      - HOME=/tmp
       - DROPPR_CACHE_DIR=/database/thumb-cache
       - DROPPR_THUMB_MAX_CONCURRENCY=1
       - DROPPR_PROXY_CACHE_DIR=/database/proxy-cache
       - DROPPR_PROXY_MAX_CONCURRENCY=1
+      - DROPPR_ROBUST_SHARES_DB_PATH=/database/droppr-robust-shares.sqlite3
+      # Client-side session timeout enforcement (Droppr panel)
+      - DROPPR_SESSION_ADMIN_IDLE_MINUTES=${DROPPR_SESSION_ADMIN_IDLE_MINUTES:-240}
+      - DROPPR_SESSION_USER_IDLE_MINUTES=${DROPPR_SESSION_USER_IDLE_MINUTES:-480}
+      - DROPPR_SESSION_ADMIN_MAX_MINUTES=${DROPPR_SESSION_ADMIN_MAX_MINUTES:-720}
+      - DROPPR_SESSION_USER_MAX_MINUTES=${DROPPR_SESSION_USER_MAX_MINUTES:-1440}
+      - DROPPR_SESSION_WARNING_SECONDS=${DROPPR_SESSION_WARNING_SECONDS:-60}
+      # Upload Request notifications (optional webhooks)
+      - DROPPR_PUBLIC_BASE_URL=${DROPPR_PUBLIC_BASE_URL:-}
+      - DROPPR_UPLOAD_WEBHOOK_URL=${DROPPR_UPLOAD_WEBHOOK_URL:-}
+      - DROPPR_UPLOAD_WEBHOOK_SECRET=${DROPPR_UPLOAD_WEBHOOK_SECRET:-}
+      - DROPPR_UPLOAD_WEBHOOK_TIMEOUT_SECONDS=${DROPPR_UPLOAD_WEBHOOK_TIMEOUT_SECONDS:-5}
+      # Upload Request limits (200 GB max file size by default)
+      - DROPPR_UPLOAD_REQUEST_DEFAULT_MAX_FILE_MB=${DROPPR_UPLOAD_REQUEST_DEFAULT_MAX_FILE_MB:-204800}
+      - DROPPR_UPLOAD_REQUEST_HARD_MAX_FILE_MB=${DROPPR_UPLOAD_REQUEST_HARD_MAX_FILE_MB:-204800}
+      # Resumable upload sessions (200 GB files use 32 MiB chunks / 6,400 requests).
+      - DROPPR_UPLOAD_SESSION_CHUNK_SIZE_BYTES=${DROPPR_UPLOAD_SESSION_CHUNK_SIZE_BYTES:-16777216}
+      - DROPPR_UPLOAD_SESSION_MAX_CHUNK_SIZE_BYTES=${DROPPR_UPLOAD_SESSION_MAX_CHUNK_SIZE_BYTES:-67108864}
+      - DROPPR_UPLOAD_SESSION_MIN_FREE_BYTES=${DROPPR_UPLOAD_SESSION_MIN_FREE_BYTES:-8589934592}
+      - DROPPR_UPLOAD_SESSION_STALE_TTL_SECONDS=${DROPPR_UPLOAD_SESSION_STALE_TTL_SECONDS:-2592000}
+      - DROPPR_UPLOAD_SESSION_MAX_ACTIVE_PER_REQUEST=${DROPPR_UPLOAD_SESSION_MAX_ACTIVE_PER_REQUEST:-16}
     depends_on:
       - app
     networks:

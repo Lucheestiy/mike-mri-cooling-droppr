@@ -22,6 +22,13 @@ if ! rg -q "Shared Media Gallery" <<<"${html}"; then
 fi
 version="$(printf '%s' "${html}" | head -n 1 | tr -d '\r' | sed -E 's/^<!-- *VERSION: *([^ ]+).*/\1/' || true)"
 echo "ok: gallery HTML (version=${version:-unknown})"
+for marker in 'id="gallerySummary"' 'id="copyLinkBtn"' 'class="material-icons search-icon"'; do
+  if ! rg -q "${marker}" <<<"${html}"; then
+    echo "FAIL: gallery HTML missing recipient UI marker: ${marker}" >&2
+    exit 1
+  fi
+done
+echo "ok: gallery recipient UI"
 
 echo "GET ${files_url}"
 json="$(curl -fsS "${files_url}")"
@@ -127,6 +134,12 @@ if [[ -n "$video_path_encoded" ]]; then
     echo "FAIL: player HTML missing video element" >&2
     exit 1
   fi
+  for marker in 'id="copyLinkBtn"' 'id="toast"' 'material-icons'; do
+    if ! rg -q "${marker}" <<<"${player_html}"; then
+      echo "FAIL: player HTML missing UI marker: ${marker}" >&2
+      exit 1
+    fi
+  done
   echo "ok: player HTML"
 fi
 

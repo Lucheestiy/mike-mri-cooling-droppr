@@ -20,6 +20,14 @@ Note: the gallery caches a share for performance. If you add new files after cre
   - `DROPPR_ANALYTICS_RETENTION_DAYS=180` (set `0` to disable retention cleanup)
   - `DROPPR_ANALYTICS_IP_MODE=full|anonymized|off`
 
+## Admin Link Manager
+
+- Admin page: `/manage` (lists Robust Shares + Upload Requests; revoke links; copy/open links).
+- Robust Shares can be refreshed from `/manage` to rescan the original file/folder
+  while keeping the same `/share/RS_*` URL.
+- The same page includes a Storage & Cache panel for generated thumbnails and
+  video proxy files, with admin-only cache clearing that skips recent/lock files.
+
 ## Fast Start (Better Video Streaming)
 
 Many iPhone `.mov` uploads store the `moov` atom at the end of the file, which makes browser playback feel extremely slow (it can look like the video won’t load until most of the file downloads).
@@ -55,6 +63,64 @@ File Browser returns HTTP `409` when uploading a file that already exists (commo
 
 When you upload **exactly one file**, Droppr automatically creates a File Browser share for that file and shows the public share link immediately (it also attempts to copy it to your clipboard). Uploading multiple files keeps the normal behavior (no auto-share).
 
+## Upload Requests (Recipients Upload Without Accounts)
+
+Admins can generate a public **upload link** for a destination folder:
+
+- In the File Browser **Files** view, select a destination folder and click **Upload Request**.
+- Configure expiry/password/limits and share the generated `/upload/UR_...` link.
+- After a successful upload, the page can generate a **view/download link** back to the uploaded folder (Robust Share).
+
+Uploads are stored under `./data/` and request/audit metadata is stored in `./database/droppr-upload-requests.sqlite3`.
+
+Public file requests use resumable upload sessions by default. Files are sent sequentially in bounded chunks, completed chunk indexes are persisted in SQLite, and reselecting the same file continues from the last saved chunk. Modern browsers negotiate SHA-256 verification for every chunk; a failed digest is rejected before its checkpoint is recorded and can be retried safely. During an active transfer, supported browsers hold a screen wake lock and automatically pause without consuming retries while offline, then continue the same chunk when the network returns. Individual files up to 200 GB use 32 MiB chunks (6,400 chunks at the limit). Partial sessions are retained for 30 days by default, then cleaned automatically. Abandoned sessions do not consume a request's completed-file allowance, so a transfer can restart after browser storage is lost; the server separately caps each request at 16 active sessions by default and enforces the file allowance atomically at commit. Commit recovery persists the temporary file's device and inode, preventing a same-size pre-existing target from being mistaken for a successfully moved upload after a crash.
+
+### Upload Request CLI (robust + repeatable)
+
+Use the API-backed helper script to create upload requests from terminal (instead of writing SQLite directly):
+
+```bash
+cd /home/mlweb/mri-cooling-droppr
+./scripts/create_upload_request.sh --path /incoming --max-files 1 --expires-hours 168
+```
+
+Examples:
+
+```bash
+# No expiry, allow only media files.
+./scripts/create_upload_request.sh \
+  --path /incoming \
+  --expires-hours 0 \
+  --allowed-exts jpg,jpeg,png,heic,mp4,mov
+
+# Use an existing X-Auth token (no password prompt).
+./scripts/create_upload_request.sh \
+  --path /incoming \
+  --token "$DROPPR_AUTH_TOKEN"
+```
+
+## Upload Request Webhooks (Optional)
+
+Configure `DROPPR_UPLOAD_WEBHOOK_URL` (comma-separated URLs supported) to receive JSON POST events:
+
+- `upload_request.created`
+- `upload_request.disabled`
+- `upload_request.uploaded`
+- `upload_request.share_created`
+
+Optional: set `DROPPR_UPLOAD_WEBHOOK_SECRET` to receive an `X-Droppr-Signature: sha256=...` header (HMAC over the JSON body). If you set `DROPPR_PUBLIC_BASE_URL`, webhook payloads include absolute links.
+
+## Robust Share Expiry (RS_*)
+
+Robust Shares can optionally expire (`expires_hours`, `0 = never`). Expired shares return `410 Gone` for public access.
+
+## Session Logout Timers (Admin vs Users)
+
+The injected Droppr panel can enforce client-side logout timers (idle timeout + max session age) with separate values for admins vs non-admin users.
+
+- Configure in the File Browser UI: **Settings** → **Droppr Session Settings** (admin-only; stored in `./database/droppr-settings.sqlite3`).
+- Or set defaults via env vars (see `.env.example`).
+
 ## Start
 
 ```bash
@@ -85,9 +151,10 @@ Some clients rely on `HEAD` and conditional GETs for media endpoints like `/api/
 - Upload/manage files in `./data/` (host path: `/home/mlweb/mri-cooling-droppr/data`).
 - Persistent state is stored in `./database/` and `./config/`.
 
-## Public URL (Cloudflare Tunnel)
+## Legacy Cloudflare Tunnel Fallback
 
-Droppr runs its own Cloudflare tunnel (separate from the production stack).
+Droppr has an independent Cloudflare tunnel configuration, but `droppr.coolmri.com` is currently served through the direct VPS bypass below. This host may still have `cloudflared-droppr` running as a short DNS-cache propagation fallback; fresh deploys keep it off unless the `tunnel` profile is requested.
+The `cloudflared-droppr` container is gated behind the `tunnel` Compose profile, so a normal `docker compose up -d` does not start it.
 
 Create the tunnel + config/credentials:
 
@@ -103,4 +170,26 @@ cd /home/mlweb/mri-cooling-droppr
 docker compose --profile tunnel up -d
 ```
 
-In Cloudflare DNS, add the CNAME record printed by the setup script (`droppr` → `<TUNNEL_ID>.cfargotunnel.com`).
+For rollback, add the CNAME record printed by the setup script (`droppr` → `<TUNNEL_ID>.cfargotunnel.com`) and proxy it in Cloudflare.
+
+## Direct VPS Bypass (No Cloudflare Data Path)
+
+For large uploads and video streaming, `droppr.coolmri.com` is now pointed at the same VPS bypass pattern used by the Dropbox upload path. A test hostname is also available:
+
+```text
+https://droppr.coolmri.com
+https://droppr.104.236.97.60.nip.io
+```
+
+Both proxy through VPS `104.236.97.60` to a reverse SSH tunnel back to local Droppr port `8098`. See `docs/VPS_BYPASS.md`.
+
+Quick health check:
+
+```bash
+./scripts/smoke_stack.sh
+# Isolated VPS-only check:
+./scripts/smoke_vps_bypass.sh --range-url https://droppr.coolmri.com/api/robust-share/RS_droppr_direct_smoke/download/range-sentinel.txt
+```
+
+Install the optional recurring monitor with `deploy/droppr-direct-smoke.service` and `deploy/droppr-direct-smoke.timer`.
+Use `./scripts/check_vps_bypass_soak.sh` after the monitor has run for 24 hours to decide when the Cloudflare fallback can be stopped.
